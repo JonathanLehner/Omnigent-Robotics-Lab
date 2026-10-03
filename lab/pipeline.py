@@ -1,0 +1,195 @@
+"""Assembly pipeline: the method the lab develops. Agents edit methods (configs, stage implementations,
+prompts), not this contract.
+
+A method version = methods/<name>.yaml + the git commit. The config names one implementation per stage:
+  perceive    image -> structure spec            oracle | vlm
+  plan_order  spec -> build order                oracle | support_sort | llm
+  build       approach, grasp, carry, place, release per block (rung 0: scripted IK + weld grasp)
+  verify      settle 5 s, compare to the oracle target (lab/metrics.py, frozen)
+Register a new implementation with @stage("plan_order", "my_impl") in this file or in lab/stages/*.py.
+"""
+
+import importlib
+import json
+import pkgutil
+from pathlib import Path
+
+import numpy as np
+import yaml
+
+from lab import metrics, scenes, sim
+from lab.method_models import call_model
+
+ROOT = Path(__file__).resolve().parent.parent
+STAGES: dict[str, dict] = {"perceive": {}, "plan_order": {}, "build": {}}
+
+
+def stage(kind, name):
+    def reg(fn):
+        STAGES[kind][name] = fn
+        return fn
+    return reg
+
+
+def load_method(name: str) -> dict:
+    cfg = yaml.safe_load((ROOT / "methods" / f"{name}.yaml").read_text())
+    for kind in STAGES:
+        impl = cfg["stages"][kind]
+        if impl not in STAGES[kind]:
+            raise ValueError(f"method {name}: unknown {kind} implementation {impl!r}; have {sorted(STAGES[kind])}")
+    return cfg
+
+
+# --- perceive ----------------------------------------------------------------
+@stage("perceive", "oracle")
+def perceive_oracle(scene, cfg):
+    return json.loads(json.dumps(scene["target"]["blocks"])), {}
+
+
+@stage("perceive", "vlm")
+def perceive_vlm(scene, cfg):
+    """Parse the target picture with a method model. Prompt + schema are versioned files under prompts/."""
+    p = cfg["perceive"]
+    res = call_model(p["model"], p["prompt"], text=p.get("text", ""), image=str(ROOT / scene["image"]))
+    blocks = res["output"]["blocks"]
+    for i, b in enumerate(blocks):
+        b.setdefault("id", f"p{i}")
+        b.setdefault("yaw", 0.0)
+    scenes.support_relations(blocks)
+    return blocks, {"model_key": res["key"], "cached": res["cached"]}
+
+
+# --- plan_order --------------------------------------------------------------
+@stage("plan_order", "oracle")
+def order_oracle(spec, scene, cfg):
+    by_id = {b["id"]: b for b in spec}
+    if set(by_id) == set(scene["oracle_order"]):
+        return scene["oracle_order"]
+    return scenes.oracle_order(spec)  # perceived ids differ: fall back to z-then-y ordering
+
+
+@stage("plan_order", "support_sort")
+def order_support_sort(spec, scene, cfg):
+    """Symbolic: topological sort on `on` relations (supports first), ties left to right. Each prefix must
+    pass the settle test, otherwise the order is rejected."""
+    done, order = set(), []
+    while len(order) < len(spec):
+        ready = [b for b in spec if b["id"] not in done and set(b["on"]) <= done]
+        if not ready:
+            raise RuntimeError("order_infeasible: cyclic or unsupported spec")
+        nxt = min(ready, key=lambda b: (b["pos"][2], b["pos"][1]))
+        order.append(nxt["id"])
+        done.add(nxt["id"])
+        prefix = [scenes.to_world(b) for b in spec if b["id"] in done]
+        if not sim.settle(prefix, seconds=1.5)["stable"]:
+            raise RuntimeError(f"order_infeasible: prefix {order} not stable")
+    return order
+
+
+@stage("plan_order", "llm")
+def order_llm(spec, scene, cfg):
+    p = cfg["plan_order"]
+    res = call_model(p["model"], p["prompt"], text=json.dumps({"blocks": spec}))
+    return res["output"]["order"]
+
+
+# --- build -------------------------------------------------------------------
+def _match(spec, scene):
+    """Perceived block -> physical block, by (color, type). Unmatched blocks are perception errors."""
+    phys = {b["id"]: b for b in scene["target"]["blocks"]}
+    free, pairs, failures = dict(phys), {}, []
+    for b in spec:
+        hit = next((pid for pid, pb in free.items() if pb["color"] == b.get("color") and pb["type"] == b.get("type")), None)
+        if hit is None:
+            failures.append("perception_mismatch")
+            continue
+        pairs[b["id"]] = hit
+        free.pop(hit)
+    if free:
+        failures.append("perception_missing_block")
+    return pairs, failures
+
+
+@stage("build", "scripted_weld")
+def build_scripted_weld(world, spec, order, pairs, cfg, log):
+    """Rung 0: fixed base, scripted joint-space arm motion via IK, idealized weld grasp."""
+    prm = cfg.get("params", {})
+    seg, clear, lift = prm.get("segment_s", 1.0), prm.get("place_clearance_m", 0.005), prm.get("carry_height_m", 0.15)
+    by_id = {b["id"]: b for b in spec}
+    top = 0.0
+    for sid in order:
+        if sid not in pairs:
+            continue
+        b, pid = by_id[sid], pairs[sid]
+        hp = sim.handle_point(b["type"])
+        bp, _ = world.block_pose(pid)
+        target = sim.SITE + np.asarray(b["pos"])
+        pick, place = bp + hp, target + hp
+        pitch = next((a for a in sim.GRASP_PITCH_DEG
+                      if world.ik(pick, sim.pitch_quat(a))[1] < 0.01 and world.ik(place, sim.pitch_quat(a))[1] < 0.01), None)
+        if pitch is None:
+            log["failures"].append("unreachable")
+            continue
+        q = sim.pitch_quat(pitch)
+        back = sim.rot(q, [-0.10, 0, 0])
+        carry_z = max(top, target[2]) + lift
+        world.set_gripper(True)
+        for p in (pick + back + [0, 0, 0.05], pick + back, pick):  # approach
+            world.move_joints(world.ik(p, q)[0], seg)
+        world.set_gripper(False)
+        world.grasp(pid)
+        for p in (pick + [0, 0, lift], [place[0], place[1], carry_z], place + [0, 0, 0.04], place + [0, 0, clear]):  # carry, place
+            world.move_joints(world.ik(p, q)[0], seg)
+        pre = world.block_pose(pid)
+        world.release()
+        world.set_gripper(True)
+        for p in (place + back, place + back + [0, 0, 0.1]):  # retreat
+            world.move_joints(world.ik(p, q)[0], seg * 0.7)
+        log["stages"].append({"block": pid, "pitch": pitch, "pre_release_err_m": float(np.linalg.norm(pre[0] - target))})
+        top = max(top, target[2] + sim.BLOCK_TYPES[b["type"]][2] / 2)
+
+
+# --- episode -----------------------------------------------------------------
+def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None = None) -> dict:
+    rng = np.random.default_rng(seed)
+    log = {"scene": scene["id"], "tier": scene["tier"], "seed": seed, "method": cfg["name"], "failures": [], "stages": []}
+    start = {s["id"]: s for s in scene["start"]}
+    blocks = [scenes.to_world(b, pos=np.asarray(start[b["id"]]["pos"]) - sim.SITE + [*rng.uniform(-0.02, 0.02, 2), 0],
+                              yaw=float(rng.uniform(-3, 3)))
+              for b in scene["target"]["blocks"]]
+    try:
+        spec, info = STAGES["perceive"][cfg["stages"]["perceive"]](scene, cfg)
+        log["perceive"] = info | {"n_blocks": len(spec)}
+        order = STAGES["plan_order"][cfg["stages"]["plan_order"]](spec, scene, cfg)
+        log["order"] = order
+    except Exception as e:  # noqa: BLE001 - a broken stage is a result, not a crash
+        log["failures"].append(str(e).split(":")[0] if "infeasible" in str(e) else f"stage_error:{type(e).__name__}")
+        spec, order = [], []
+    pairs, fails = _match(spec, scene)
+    log["failures"] += fails
+    world = sim.World(blocks, arm_block_collision=cfg.get("arm_block_collision", False), frame_every_s=frame_every_s)
+    STAGES["build"][cfg["stages"]["build"]](world, spec, order, pairs, cfg, log)
+    world.step(int(metrics.SETTLE_S / world.m.opt.timestep))  # verify: settle after the last release
+    per_block = []
+    for b in scene["target"]["blocks"]:
+        pos, quat = world.block_pose(b["id"])
+        pe, ae = metrics.block_errors(sim.SITE + np.asarray(b["pos"]), b["yaw"], pos, quat)
+        per_block.append({"id": b["id"], "pos_err": pe, "ang_err": ae})
+    log["blocks"] = per_block
+    log["success"] = metrics.episode_success(per_block)
+    if not log["success"] and not log["failures"]:
+        log["failures"].append("placement_error")
+    log["sim_time_s"] = float(world.d.time)
+    if frame_every_s:
+        log["_frames"] = world.frames
+    return log
+
+
+def _load_plugins():
+    pkg = ROOT / "lab" / "stages"
+    if pkg.is_dir():
+        for mod in pkgutil.iter_modules([str(pkg)]):
+            importlib.import_module(f"lab.stages.{mod.name}")
+
+
+_load_plugins()

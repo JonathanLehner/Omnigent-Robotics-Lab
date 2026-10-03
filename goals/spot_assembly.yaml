@@ -1,0 +1,22 @@
+# Goal spec: the only goal-specific configuration the agents need. A new goal = a new file like this one.
+question: >-
+  How can a Spot robot plan and assemble a target structure, given only a picture of it, from handled
+  building blocks, without task-specific training?
+robots_allowed: [spot]
+success_criteria: lab/metrics.py (frozen) - every block within 3 cm and 10 deg of target, 5 s after the last release
+scene_tiers:
+  T0: single block place
+  T1: two-block stack (cube on cube, cube on brick)
+  T2: three blocks (tower, wall, bridge)
+  T3: L, T and stepped pyramid (3-6 blocks)
+method_v0: methods/v0.yaml
+de_idealization_ladder:
+  - {rung: 0, replaces: nothing, with: "v0: oracle spec, oracle order, fixed base, weld grasp, scripted arm"}
+  - {rung: 1, replaces: oracle build order, with: planned order (symbolic or LLM), checked by the settle test}
+  - {rung: 2, replaces: robot placed at the site, with: walking approach with the whole-body policy (Sumo)}
+  - {rung: 3, replaces: weld grasp, with: real gripper grasp on the handle}
+  - {rung: 4, replaces: scripted placement, with: placement chosen by the lab (e.g. MPC with an agent-written cost)}
+  - {rung: 5, replaces: oracle structure spec, with: spec parsed from the target image}
+rung_rule: a rung counts only if the method still meets the success target on that rung's dev scenes; the agents may reorder rungs
+success_target: ">= 0.8 success on the tier's dev scenes, CI reported"
+budget: {episodes: 1500, wall_clock_hours: 24}

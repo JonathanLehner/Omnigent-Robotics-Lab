@@ -1,0 +1,13 @@
+# Method v0 (rung 0): oracles everywhere, so the lab starts from a working method.
+name: v0
+rung: 0
+idealizations: [oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision]
+arm_block_collision: false
+stages:
+  perceive: oracle
+  plan_order: oracle
+  build: scripted_weld
+params:
+  segment_s: 1.0
+  place_clearance_m: 0.005
+  carry_height_m: 0.15

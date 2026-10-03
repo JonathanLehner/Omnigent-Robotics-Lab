@@ -1,0 +1,38 @@
+{
+ "id": "T0-ho-03",
+ "tier": "T0",
+ "split": "heldout",
+ "seed": 9002,
+ "structure": "single",
+ "target": {
+  "blocks": [
+   {
+    "type": "brick",
+    "pos": [
+     0.0,
+     0,
+     0.05
+    ],
+    "yaw": 0.0,
+    "id": "b0",
+    "color": "green",
+    "on": []
+   }
+  ]
+ },
+ "oracle_order": [
+  "b0"
+ ],
+ "start": [
+  {
+   "id": "b0",
+   "pos": [
+    0.5061320057255682,
+    0.303204111243692,
+    0.05
+   ],
+   "yaw": 0.0
+  }
+ ],
+ "image": "scenes/heldout/T0-ho-03.png"
+}

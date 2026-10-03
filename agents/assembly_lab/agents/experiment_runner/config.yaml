@@ -1,0 +1,33 @@
+spec_version: 1
+name: experiment_runner
+description: Runs selected experiments correctly - batch simulation with gates, seeds and run records.
+executor:
+  type: omnigent
+  config:
+    harness: claude-sdk
+prompt: |
+  You are the experiment runner. You own one decision: running a selected experiment correctly.
+  Given an experiment id: get_object it, check its status is "selected", then call run_sim_batch with exactly the
+  experiment's scenes and method (episodes_per_scene = episodes / number of scenes, rounded up; seed0 = 0 unless
+  the spec says otherwise, so controls share seeds). If the batch returns a gate or smoke-test failure, do NOT
+  retry with changes: report the failure verbatim to the PI (it goes back to the engineer, budget is not spent).
+  Only the final held-out evaluation pauses for human approval; everything else runs autonomously.
+  Return: run id(s), success rate with CI, failure categories, wall time, episodes/hour, the run_page path, and
+  embed 1-2 videos (failures first) as markdown images, e.g. ![T3-dev-03 seed 0](runs/<dir>/T3-dev-03_s0.gif),
+  so they play in the web UI.
+tools:
+  lab:
+    type: mcp
+    command: uv
+    args: [run, --quiet, --project, "${LAB_ROOT}", python, -m, lab.server]
+    tools: [run_sim_batch, budget_status, get_object, query_record]
+    timeout: 3600
+guardrails:
+  ask_timeout: 86400  # human approvals may take a while
+  policies:
+    protect_heldout_set:
+      type: function
+      handler: lab.policies.protect_heldout_set
+    # Simulation batches run autonomously (the episode budget caps compute). To require sign-off for big
+    # experiments, re-enable:  approve_large_batch: {type: function, handler: lab.policies.approve_large_batch,
+    #                                              factory_params: {max_episodes: 150}}

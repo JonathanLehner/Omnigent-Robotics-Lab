@@ -1,0 +1,38 @@
+{
+ "id": "T0-dev-03",
+ "tier": "T0",
+ "split": "dev",
+ "seed": 1002,
+ "structure": "single",
+ "target": {
+  "blocks": [
+   {
+    "type": "brick",
+    "pos": [
+     0.0,
+     0,
+     0.05
+    ],
+    "yaw": 0.0,
+    "id": "b0",
+    "color": "green",
+    "on": []
+   }
+  ]
+ },
+ "oracle_order": [
+  "b0"
+ ],
+ "start": [
+  {
+   "id": "b0",
+   "pos": [
+    0.5794269560963659,
+    0.2809114848318888,
+    0.05
+   ],
+   "yaw": 0.0
+  }
+ ],
+ "image": "scenes/dev/T0-dev-03.png"
+}

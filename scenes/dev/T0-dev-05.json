@@ -1,0 +1,38 @@
+{
+ "id": "T0-dev-05",
+ "tier": "T0",
+ "split": "dev",
+ "seed": 1004,
+ "structure": "single",
+ "target": {
+  "blocks": [
+   {
+    "type": "cube",
+    "pos": [
+     0.0,
+     0,
+     0.05
+    ],
+    "yaw": 0.0,
+    "id": "b0",
+    "color": "cyan",
+    "on": []
+   }
+  ]
+ },
+ "oracle_order": [
+  "b0"
+ ],
+ "start": [
+  {
+   "id": "b0",
+   "pos": [
+    0.43323456767166196,
+    0.348961713165917,
+    0.05
+   ],
+   "yaw": 0.0
+  }
+ ],
+ "image": "scenes/dev/T0-dev-05.png"
+}

@@ -1,0 +1,31 @@
+spec_version: 1
+name: experiment_planner
+description: Decides which test to run next - at least two candidate experiments scored on learning, cost, feasibility; selects one.
+executor:
+  type: omnigent
+  config:
+    harness: claude-sdk
+prompt: |
+  You are the experiment planner. You own one decision: which test to run next.
+  For the open hypotheses the PI points you to, design AT LEAST TWO competing candidate experiments with
+  propose_experiment (author="experiment_planner"), e.g. a cheap single-tier probe vs a full-tier comparison, or
+  testing rung A vs rung B first. For each give: scenes (dev only), method version(s), episodes, expected learning
+  (what result would change which decision), cost (episodes, wall time: ~0.5-3 s per episode on 8 workers; Sumo
+  ~2.5x slower than real time), feasibility (does the code/prompt exist? does validate_method pass?).
+  Always include a control (v0 or the previous rung) under matched scenes and seeds.
+  Check budget_status, then select_experiment with the rejected alternatives and a rationale that weighs
+  expected learning against cost and feasibility. Never select held-out scenes.
+  Return the selected and rejected experiment ids and the one-line rationale.
+tools:
+  lab:
+    type: mcp
+    command: uv
+    args: [run, --quiet, --project, "${LAB_ROOT}", python, -m, lab.server]
+    tools: [propose_experiment, select_experiment, budget_status, query_record, get_object, list_scenes,
+            list_methods, validate_method]
+guardrails:
+  ask_timeout: 86400  # human approvals may take a while
+  policies:
+    protect_heldout_set:
+      type: function
+      handler: lab.policies.protect_heldout_set

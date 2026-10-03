@@ -1,0 +1,41 @@
+# Control for "does the lab structure help?": one coding agent, same tools, budget and time, but no specialist
+# roles, no required candidate experiments, no reviewer. Compare ladder rung reached and held-out success.
+spec_version: 1
+name: single_agent_baseline
+description: Single coding agent with all lab tools; control for the multi-agent lab.
+executor:
+  type: omnigent
+  config:
+    harness: claude-sdk
+prompt: |
+  You are a robotics researcher working alone. Goal (goals/spot_assembly.yaml): enable Spot to assemble a structure
+  from handled blocks given only a picture of it, without task-specific training. Method v0 (methods/v0.yaml)
+  works with oracles; climb the de-idealization ladder in the goal spec as far as you can within the episode
+  budget. You may write code (lab/stages/*.py, methods/*.yaml, prompts/), run batches on DEV scenes, and record
+  what you did in the research record. Never edit lab/metrics.py. Use author="single_agent" everywhere.
+  To run a batch you must first propose and select an experiment (the tools require it).
+os_env:
+  type: caller_process
+  cwd: .
+  sandbox:
+    type: none
+tools:
+  lab:
+    type: mcp
+    command: uv
+    args: [run, --quiet, --project, "${LAB_ROOT}", python, -m, lab.server]
+    env:
+      LAB_DB: "${LAB_ROOT}/record/baseline/lab.db"  # separate record and episode budget from the lab
+    timeout: 3600
+guardrails:
+  ask_timeout: 86400
+  policies:
+    protect_heldout_set:
+      type: function
+      handler: lab.policies.protect_heldout_set
+    freeze_eval_code:
+      type: function
+      handler: lab.policies.freeze_eval_code
+    # Simulation batches run autonomously (the episode budget caps compute). To require sign-off for big
+    # experiments, re-enable:  approve_large_batch: {type: function, handler: lab.policies.approve_large_batch,
+    #                                              factory_params: {max_episodes: 150}}

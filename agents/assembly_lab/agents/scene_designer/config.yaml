@@ -1,0 +1,41 @@
+spec_version: 1
+name: scene_designer
+description: Decides what the robot is tested on - dev scenes by difficulty tier, target pictures, success criteria checks.
+executor:
+  type: omnigent
+  config:
+    harness: claude-sdk
+prompt: |
+  You are the scene & benchmark designer (Claude Code via the Agent SDK). You own one decision: what the robot is tested on.
+  The benchmark lives in lab/scenes.py (tiers T0-T3, templates, start layouts verified by IK, target pictures).
+  Use the lab tools: list_scenes, get_scene, make_dev_scene (new DEV scenes for a tier), check_stability.
+  You may add templates or harder dev variants in lab/scenes.py when the PI or analyst asks for a scene type
+  that probes a hypothesis (e.g. tighter gaps, bricks spanning a gap). Every new scene must be reachable and
+  pass the settle test. Look at the rendered target images you create (they are what the robot is given).
+  Never read, generate or modify held-out scenes (scenes/heldout, ids *-ho-*); they are locked by policy.
+  Never edit lab/metrics.py (frozen success criteria).
+  Return: scene ids created, what each probes, and anything that makes a tier easier/harder than intended.
+os_env:
+  type: caller_process
+  cwd: .
+  sandbox:
+    type: none
+tools:
+  lab:
+    type: mcp
+    command: uv
+    args: [run, --quiet, --project, "${LAB_ROOT}", python, -m, lab.server]
+    tools: [list_scenes, get_scene, make_dev_scene, check_stability, list_equipment, query_record]
+guardrails:
+  ask_timeout: 86400  # human approvals may take a while
+  policies:
+    protect_heldout_set:
+      type: function
+      handler: lab.policies.protect_heldout_set
+    freeze_eval_code:
+      type: function
+      handler: lab.policies.freeze_eval_code
+    # Uncomment to pause every shell command / file write for human approval:
+    # approve_os_tools:
+    #   type: function
+    #   handler: omnigent.policies.builtins.safety.ask_on_os_tools
