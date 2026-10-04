@@ -260,6 +260,12 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
     requested = set(pairs) if pairs else {(scene_id, seed0 + i)
                                           for scene_id in scene_ids
                                           for i in range(episodes_per_scene)}
+    # Count episodes, not just unique pairs: a repeated batch (same pairs again) must not slip past the plan.
+    episodes_so_far = sum(int(r["data"]["episodes"]) for r in prior)
+    if not final_eval and episodes_so_far + n > int(exp["data"]["episodes"]):
+        raise RuntimeError(f"experiment {experiment_id} planned {exp['data']['episodes']} episodes in total; "
+                           f"{episodes_so_far} already run (all arms), {n} more requested. "
+                           f"Propose a new experiment (or an amendment) for more.")
     if not final_eval and len(done | requested) > int(exp["data"]["episodes"]):
         raise RuntimeError(f"experiment {experiment_id} planned {exp['data']['episodes']} unique episodes; "
                            f"{len(done)} already run for {method}, "
