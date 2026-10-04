@@ -6,6 +6,7 @@ from PIL import Image
 
 from lab import sim
 from lab.stages import vlm_measure
+from lab.stages import vlm_measure_telemetry
 
 
 class GuardedScene(dict):
@@ -73,3 +74,38 @@ def test_vlm_measure_is_invariant_to_deleted_or_poisoned_oracle_fields(tmp_path,
     assert len(clean_output[1]["image_sha256"]) == 64
     assert len(clean_output[1]["response_sha256"]) == 64
     assert clean_output[1]["vlm_output_sha256"] == poisoned_output[1]["vlm_output_sha256"]
+
+
+def test_white_detector_uses_neutral_face_handle_on_bridge_supports():
+    image = np.zeros((100, 180, 3), dtype=np.uint8)
+    image[45:85, 20:80] = [54, 25, 74]
+    image[45:85, 100:160] = [90, 90, 90]
+    image[55:65, 35:65] = 10
+    image[55:65, 115:145] = 10
+
+    center, width = vlm_measure._detect_bbox(image, "white", "cube")
+
+    assert center == 129.5
+    assert math.isnan(width)
+
+
+def test_position_error_telemetry_is_perceived_minus_true():
+    perceived = [{
+        "id": "p0",
+        "color": "white",
+        "type": "cube",
+        "pos": [0.0, 0.07, 0.05],
+    }]
+    scene = {"target": {"blocks": [{
+        "id": "b0",
+        "color": "white",
+        "type": "cube",
+        "pos": [0.0, 0.06, 0.05],
+    }]}}
+
+    telemetry = vlm_measure_telemetry._position_errors(perceived, scene)
+
+    assert np.allclose(
+        telemetry[0]["error_perceived_minus_true_xyz_m"],
+        [0.0, 0.01, 0.0],
+    )

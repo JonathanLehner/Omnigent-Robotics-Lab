@@ -22,7 +22,9 @@ params:
   grasp_close_command: -0.5
   grasp_close_dwell_s: 1.0
   release_dwell_s: 0.5
-  release_vertical_lift_m: 0.125
+  # Joint-space tracking realizes about 87% of the Cartesian waypoint delta.
+  # This margin yields >=0.12 m measured world-z lift before lateral retreat.
+  release_vertical_lift_m: 0.15
   release_vertical_lift_steps: 12
   release_phase_settle_s: 5.0
   min_transport_m: 0.08

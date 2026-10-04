@@ -10,7 +10,7 @@ idealizations:
   - fixed_base
   - weld_grasp
   - no_arm_block_collision
-  - sumo_to_assembly_state_bridge (lab block set to Sumo terminal pose)
+  - sumo_to_assembly_state_bridge (teleport lab block to Sumo terminal pose, never snap to goal)
 arm_block_collision: false
 stages:
   perceive: oracle

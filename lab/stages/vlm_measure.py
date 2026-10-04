@@ -94,10 +94,10 @@ def _components(mask: np.ndarray) -> list[tuple[int, int, int, int, int]]:
 def _detect_bbox(image: np.ndarray, color: str, block_type: str) -> tuple[float, float] | None:
     """Return (horizontal centre px, visible width px) for one unique color."""
     if color == "white":
-        # Neutral floor/shadow pixels can join the white block's mask. Its black
-        # handle is isolated and horizontally centred on the face, so use that
-        # centre; omit a contaminated body width from the scale estimate.
-        neutral = _components(_color_mask(image, color))
+        # Neutral floor/shadow pixels can join adjacent block bodies into one
+        # component. Rank black handles by the amount of neutral block face in a
+        # local window instead of assigning every handle inside that component.
+        neutral_mask = _color_mask(image, color)
         dark = image.max(axis=2) < 32
         handles = []
         for area, left, top, right, bottom in _components(dark):
@@ -105,19 +105,22 @@ def _detect_bbox(image: np.ndarray, color: str, block_type: str) -> tuple[float,
             if area >= 60 and 15 <= width <= 45 and 5 <= height <= 18:
                 handles.append((area, left, top, right, bottom))
         matches = []
-        expected_ratio = BLOCK_WIDTH_M[block_type] / 0.10
-        for area, left, top, right, bottom in neutral:
-            width, height = right - left + 1, bottom - top + 1
-            if area < 80 or width < 20 or height < 15:
-                continue
-            for handle_area, hleft, htop, hright, hbottom in handles:
-                if left <= hleft and hright <= right and top <= htop and hbottom <= bottom:
-                    ratio_error = abs(width / height - expected_ratio)
-                    usable_width = float(width) if ratio_error < 0.5 else float("nan")
-                    matches.append((ratio_error, -handle_area, (hleft + hright) / 2.0, usable_width))
+        half_width = 34 if block_type == "cube" else 65
+        for handle_area, left, top, right, bottom in handles:
+            centre = (left + right) / 2.0
+            x0 = max(0, int(round(centre)) - half_width)
+            x1 = min(image.shape[1], int(round(centre)) + half_width + 1)
+            y0 = max(0, top - 15)
+            y1 = min(image.shape[0], bottom + 29)
+            support = int(neutral_mask[y0:y1, x0:x1].sum())
+            window_area = max(1, (y1 - y0) * (x1 - x0))
+            matches.append((support / window_area, handle_area, centre))
         if matches:
-            _, _, centre, width = min(matches)
-            return centre, width
+            support_fraction, _, centre = max(matches)
+            if support_fraction >= 0.20:
+                # The body width is intentionally omitted: a neighboring neutral
+                # floor patch can contaminate it, while colored blocks provide scale.
+                return centre, float("nan")
 
     candidates = []
     for area, left, top, right, bottom in _components(_color_mask(image, color)):

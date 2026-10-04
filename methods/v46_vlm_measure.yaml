@@ -12,7 +12,7 @@ idealizations:
   - z_from_layer
 arm_block_collision: false
 stages:
-  perceive: vlm_measure
+  perceive: vlm_measure_telemetry
   plan_order: oracle
   build: closed_loop_weld_place
 perceive:

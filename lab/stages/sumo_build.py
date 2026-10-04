@@ -204,6 +204,8 @@ def build_sumo_mpc_weld_place(world, spec, order, pairs, cfg, log):
         stage_log = {
             "phase": "mpc_place",
             "block": pid,
+            "assembly_bridge": "teleport_sumo_terminal_free_joint_pose",
+            "bridge_snaps_to_goal": False,
             "scene_object_start_pose": object_start_pose.tolist(),
             "scene_object_goal_pose": object_goal_pose.tolist(),
             "handoff_displacement_xyz_m": None,
@@ -215,6 +217,15 @@ def build_sumo_mpc_weld_place(world, spec, order, pairs, cfg, log):
             **episode,
         }
         log["stages"].append(stage_log)
+        echoed_goal = episode.get("object_goal_pose")
+        if echoed_goal is None or not np.allclose(
+            np.asarray(echoed_goal, dtype=float),
+            object_goal_pose,
+            atol=1e-9,
+            rtol=0.0,
+        ):
+            log["failures"].append("sumo_object_goal_mismatch")
+            continue
         if not episode["success"]:
             log["failures"].append("mpc_place_failed")
         if episode.get("final_qpos") is None:
