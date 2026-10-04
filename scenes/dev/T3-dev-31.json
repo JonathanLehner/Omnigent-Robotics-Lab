@@ -1,0 +1,116 @@
+{
+ "id": "T3-dev-31",
+ "tier": "T3",
+ "split": "dev",
+ "seed": 24345,
+ "structure": "bridge_cap",
+ "target": {
+  "blocks": [
+   {
+    "id": "b0",
+    "type": "cube",
+    "color": "green",
+    "pos": [
+     0,
+     -0.081,
+     0.05
+    ],
+    "yaw": 0,
+    "on": []
+   },
+   {
+    "id": "b1",
+    "type": "cube",
+    "color": "yellow",
+    "pos": [
+     0,
+     0.093,
+     0.05
+    ],
+    "yaw": 0,
+    "on": []
+   },
+   {
+    "id": "b2",
+    "type": "brick",
+    "color": "orange",
+    "pos": [
+     0,
+     0.006,
+     0.15
+    ],
+    "yaw": 0,
+    "on": [
+     "b0",
+     "b1"
+    ]
+   },
+   {
+    "id": "b3",
+    "type": "cube",
+    "color": "red",
+    "pos": [
+     0,
+     0.036,
+     0.25
+    ],
+    "yaw": 0,
+    "on": [
+     "b2"
+    ]
+   }
+  ]
+ },
+ "oracle_order": [
+  "b0",
+  "b1",
+  "b2",
+  "b3"
+ ],
+ "start": [
+  {
+   "id": "b0",
+   "pos": [
+    0.41550254447635093,
+    -0.30110690858191586,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b1",
+   "pos": [
+    0.48224899020838186,
+    0.22875880040341562,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b2",
+   "pos": [
+    0.622896233118745,
+    -0.31416017353450976,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b3",
+   "pos": [
+    0.46846695907648855,
+    0.4111178909656881,
+    0.05
+   ],
+   "yaw": 0.0
+  }
+ ],
+ "image": "scenes/dev/T3-dev-31.png",
+ "image_views": {
+  "main": "scenes/dev/T3-dev-31_main.png",
+  "top": "scenes/dev/T3-dev-31_top.png",
+  "robot side": "scenes/dev/T3-dev-31_robot_side.png",
+  "left side": "scenes/dev/T3-dev-31_left_side.png"
+ },
+ "image_multiview": "scenes/dev/T3-dev-31_multiview.png"
+}
