@@ -9,7 +9,7 @@
 | 2 | Walking approach | 🔵 0.80 | 🔵 1.00 | ⚪ – | ⚪ – | 🔵 Running: T0, T1 |
 | 3 | Real gripper grasp | 🟢 1.00 | 🔴 0.00 | ⚪ – | ⚪ – | 🔴 Below target: T1 |
 | 4 | Lab-chosen placement (MPC) | ⚪ – | 🔵 1.00 | 🔵 0.62 | 🔵 0.25 | 🔵 Running: T1, T2, T3 |
-| 5 | Structure from picture | 🟢 1.00 | 🔴 0.67 | 🔴 0.75 | 🔴 0.00 | 🔴 Below target: T1, T2, T3 |
+| 5 | Structure from picture | 🟢 1.00 | 🔵 0.67 | 🔵 0.75 | 🔵 0.00 | 🔵 Running: T1, T2, T3 |
 
 🟢 passed (>= 0.80)  🔵 running now  🔴 below target  ⚪ not started. Success rate on dev scenes, latest run per cell.
 
@@ -25,6 +25,7 @@ R0/T0 1.00 [0.61, 1.00] n=6 (R-023); R0/T1 1.00 [0.76, 1.00] n=12 (R-023); R0/T2
 - **X-022** (0/24 episodes run): Rung-4 MPC T0 probe, run SERIALLY after X-019 finishes. Run v4_mpc (Sumo CEM placement; cost = block pose + upright + collision clearance + settle velocity + an. Tests -.
 - **X-025** (0/96 episodes run): Full pre-registered design. v3_grasp_lift (release_vertical_lift_m 0.125, 12 steps, no oracle correction, default physics) at seeds 0-7 on T0-dev-01..06 and T1-. Tests H-010.
 - **X-035** (0/40 episodes run): v2_walk (w_heading=160, frozen) vs fresh matched v0 control. Tests H-012.
+- **X-037** (0/72 episodes run): v46_vlm_measure vs v0. PART A (40 eps, all fresh v46): T1-dev-01..12 (confirmatory) + old off-grid T2-dev-11..14, T3-dev-13..16 (exploratory), seeds 0-1. v0 con. Tests H-013.
 
 ## Hypotheses
 
@@ -51,7 +52,7 @@ Use v45 (VLM structure + closed-loop placement) for rung-5 on T1 grid-aligned sc
 
 **Next:** H-013 Gate 0 (free, pixel-only measurement, 20 scenes). If it passes: v46_vlm_measure vs v0 on T1-dev-01..12 + 8 off-grid T2/T3 scenes, seeds 0-1, 40 episodes, on committed code. In parallel, once the human commits the tree and reloads the server: X-035 clean rung-2 test (32 episodes, H-014).
 
-**Budget:** 1387 of 1500 episodes used, 113 left. Record: 9 evidence, 14 hypotheses, 36 experiments, 46 runs, 14 results, 9 decisions.
+**Budget:** 1387 of 1500 episodes used, 113 left. Record: 9 evidence, 14 hypotheses, 39 experiments, 46 runs, 14 results, 9 decisions.
 
 ## Recent runs (videos inside)
 

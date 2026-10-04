@@ -27,6 +27,23 @@ def _j(x):
     return json.loads(json.dumps(x, default=str))
 
 
+def _fresh():
+    """Reload lab code so long-lived tool servers always run what is on disk: no manual reload, ever.
+    Order matters: pipeline re-creates its stage registry, then every stage plugin re-registers into it."""
+    import importlib
+    import sys
+
+    from lab import method_models, pipeline, report, status
+
+    for mod in (sim, scenes, method_models, pipeline):
+        importlib.reload(mod)
+    for name in sorted(n for n in sys.modules if n.startswith("lab.stages.")):
+        importlib.reload(sys.modules[name])
+    pipeline._load_plugins()
+    for mod in (runner, status, report):
+        importlib.reload(mod)
+
+
 # --- research record ----------------------------------------------------------
 @mcp.tool()
 def add_evidence(author: str, source: str, claim: str, relevance: str, quote: str = "") -> str:
@@ -115,6 +132,7 @@ def get_object(obj_id: str) -> dict:
 def lab_status() -> str:
     """The plan and where the lab is: ladder x tiers grid (latest success, CI, run), unfinished experiments,
     hypotheses, latest decision, budget, recent run pages. Markdown; post it in chat so the human sees it."""
+    _fresh()
     from lab import status
 
     return Path(status.build()).read_text()
@@ -123,6 +141,7 @@ def lab_status() -> str:
 @mcp.tool()
 def export_record() -> dict:
     """Export the full record to record/export.json and build REPORT.md (for judges and reconstruction)."""
+    _fresh()
     from lab import report
 
     return {"export": record.export(), "report": report.build()}
@@ -184,6 +203,7 @@ def get_scene(scene_id: str) -> dict:
 def make_dev_scene(author: str, tier: str, seed: int, permute_blocks: bool = False,
                    scene_id: str = "", layout: dict | None = None) -> dict:
     """Generate a DEV scene, optionally with an explicit id and {structure, blocks} target layout."""
+    _fresh()
     sid = scene_id or f"{tier}-dev-x{seed}"
     sc = scenes.make_scene(sid, tier, "dev", seed=10_000 + seed, permute_blocks=permute_blocks,
                            layout=layout)
@@ -200,12 +220,14 @@ def make_dev_scene(author: str, tier: str, seed: int, permute_blocks: bool = Fal
 @mcp.tool()
 def check_stability(blocks: list[dict], seconds: float = 3.0) -> dict:
     """Settle test without the robot. blocks: [{id, type: cube|brick, color, pos: [x,y,z] structure frame, yaw}]."""
+    _fresh()
     return sim.settle([scenes.to_world(b) for b in blocks], seconds)
 
 
 @mcp.tool()
 def list_methods() -> dict:
     """Method versions (methods/*.yaml) and the registered stage implementations."""
+    _fresh()
     from lab import pipeline
 
     return {"methods": {p.stem: yaml.safe_load(p.read_text()) for p in sorted((ROOT / "methods").glob("*.yaml"))},
@@ -215,6 +237,7 @@ def list_methods() -> dict:
 @mcp.tool()
 def validate_method(method: str, scene_ids: list[str]) -> dict:
     """Run the pre-compute gates (config, prompts, frozen eval, held-out lock) without spending budget."""
+    _fresh()
     g = runner.gates(method, scene_ids, final_eval=False)
     return {"ok": True, "stages": g["cfg"]["stages"], "idealizations": g["cfg"].get("idealizations", [])}
 
@@ -222,6 +245,7 @@ def validate_method(method: str, scene_ids: list[str]) -> dict:
 @mcp.tool()
 def budget_status() -> dict:
     """Episode budget for the session: total, used, left."""
+    _fresh()
     return runner.budget()
 
 
@@ -231,6 +255,7 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
     """Runner only: run a SELECTED experiment. Gates + one-episode smoke test first (free), then parallel episodes.
     final_eval=True unlocks held-out scenes and requires human approval. max_workers: parallel episodes (0 = default:
     8, or 1 for Sumo-based methods, which are load-sensitive); set 1 to run serially."""
+    _fresh()
     return _j(runner.run_sim_batch(experiment_id, scene_ids, method, episodes_per_scene, seed0, final_eval=final_eval,
                                    max_workers=max_workers or None))
 
@@ -238,12 +263,14 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
 @mcp.tool()
 def render_rollout(run_id: str, scene_id: str, seed: int) -> dict:
     """Re-simulate one episode of a run with frames. Returns a contact-sheet PNG + GIF path to inspect visually."""
+    _fresh()
     return _j(runner.render_rollout(run_id, scene_id, seed))
 
 
 @mcp.tool()
 def compute_metrics(run_ids: list[str]) -> dict:
     """Pool episodes across runs and recompute metrics (success rate with 95% Wilson CI, failures, per tier)."""
+    _fresh()
     from lab import metrics
 
     eps = []
@@ -265,6 +292,7 @@ def eval_prompt(model: str, prompt_path: str, scene_ids: list[str], image: str =
     """Cheap offline test without simulation: parse each dev scene's target image and score against the oracle spec
     (block count, color/type match, position error after matching). image: main | multiview (2x2 labeled views:
     main, top, robot side, left side)."""
+    _fresh()
     import numpy as np
 
     from lab.method_models import call_model as cm

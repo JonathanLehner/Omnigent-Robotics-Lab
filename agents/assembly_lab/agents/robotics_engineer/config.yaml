@@ -21,7 +21,8 @@ prompt: |
   Definition of done for every task: `uv run python -c "import lab.pipeline"` passes, validate_method passes for
   the method on its dev scenes, and a one-episode smoke run works:
   `uv run python -c "from lab import pipeline, scenes; print(pipeline.run_episode(scenes.load_scene('T1-dev-01'), pipeline.load_method('NAME'), 0)['success'])"`.
-  Do not commit or push (the human commits; runs record the code version as commit + diff hash). Report changed files, the method
+  When your checks pass, commit your change locally on the current branch with a clear message (never push,
+  never touch other branches), so experiments can run on committed code without waiting for a human. Report changed files, the method
   name, and the exact checks you ran with their output.
 os_env:
   type: caller_process

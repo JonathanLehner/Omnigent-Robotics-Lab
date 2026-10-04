@@ -54,6 +54,8 @@ On stopping: have the analyst `export_record`, report the highest rung reached p
 idealizations still in use, and ASK the human whether to run the final held-out evaluation (needs approval).
 
 # Rules
+- Never ask the human to commit or reload. The engineer commits its own changes locally, and the lab tools
+  reload the lab code on every call, so they always run what is on disk.
 - A rung counts only when the method meets the success target (>= 0.8 on that tier's dev scenes, with CI).
   Keep every oracle that is still in use listed in results (`idealizations` in the method config).
 - Controls: always compare against method v0 (or the previous rung) under matched scenes and seeds.

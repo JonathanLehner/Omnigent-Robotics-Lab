@@ -95,6 +95,32 @@ def _components(mask: np.ndarray) -> list[tuple[int, int, int, int, int]]:
 
 def _detect_bbox(image: np.ndarray, color: str, block_type: str) -> tuple[float, float] | None:
     """Return (horizontal centre px, visible width px) for one unique color."""
+    if color == "white":
+        # Neutral floor/shadow pixels can join the white block's mask. Its black
+        # handle is isolated and horizontally centred on the face, so use that
+        # centre; omit a contaminated body width from the scale estimate.
+        neutral = _components(_color_mask(image, color))
+        dark = image.max(axis=2) < 32
+        handles = []
+        for area, left, top, right, bottom in _components(dark):
+            width, height = right - left + 1, bottom - top + 1
+            if area >= 60 and 15 <= width <= 45 and 5 <= height <= 18:
+                handles.append((area, left, top, right, bottom))
+        matches = []
+        expected_ratio = BLOCK_WIDTH_M[block_type] / 0.10
+        for area, left, top, right, bottom in neutral:
+            width, height = right - left + 1, bottom - top + 1
+            if area < 80 or width < 20 or height < 15:
+                continue
+            for handle_area, hleft, htop, hright, hbottom in handles:
+                if left <= hleft and hright <= right and top <= htop and hbottom <= bottom:
+                    ratio_error = abs(width / height - expected_ratio)
+                    usable_width = float(width) if ratio_error < 0.5 else float("nan")
+                    matches.append((ratio_error, -handle_area, (hleft + hright) / 2.0, usable_width))
+        if matches:
+            _, _, centre, width = min(matches)
+            return centre, width
+
     candidates = []
     for area, left, top, right, bottom in _components(_color_mask(image, color)):
         width, height = right - left + 1, bottom - top + 1
@@ -154,6 +180,7 @@ def perceive_vlm_measure(scene, cfg):
         detection[1] / BLOCK_WIDTH_M[block["type"]]
         for block in vlm_blocks
         if (detection := detections[block["id"]]) is not None
+        and np.isfinite(detection[1])
     ]
     pixels_per_m = float(np.median(scales)) if scales else None
     bottom_centres = [

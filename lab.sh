@@ -24,6 +24,11 @@ case "$1" in
     [ $# -eq 0 ] && set -- -p "Research goal: $goal
 Pursue it autonomously: read the goal file, resume from the research record, and run discovery cycles back to back until a stop condition holds. Start by posting the Lab status table and the Now section from LAB_STATUS.md (or the lab_status tool), and post them again after every completed experiment, result and decision."
     if [ "$1" = "--new" ]; then shift; exec omnigent run agents/assembly_lab "$@"; fi
+    # Omnigent pins a session to the agent version it was created with, so a continued session would ignore
+    # config changes (models, budget, rules). Refresh the pinned copy of the latest PI session's agent first.
+    omnigent stop >/dev/null 2>&1 || true
+    aid=$(sqlite3 ~/.omnigent/chat.db "select lower(hex(c.agent_id)) from conversations c join agents a on a.id = c.agent_id where a.name = 'assembly_lab_pi' and c.parent_conversation_id is null order by c.updated_at desc limit 1" 2>/dev/null)
+    if [ -n "$aid" ] && [ -d "$HOME/.omnigent/artifacts/.cache/$aid" ]; then cp -R agents/assembly_lab/. "$HOME/.omnigent/artifacts/.cache/$aid/"; fi
     omnigent run agents/assembly_lab --continue "$@" || exec omnigent run agents/assembly_lab "$@"
     ;;
   baseline)

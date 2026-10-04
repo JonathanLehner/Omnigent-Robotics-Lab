@@ -1,0 +1,164 @@
+{
+ "id": "T3-dev-20",
+ "tier": "T3",
+ "split": "dev",
+ "seed": 14320,
+ "structure": "pyramid",
+ "target": {
+  "blocks": [
+   {
+    "type": "cube",
+    "pos": [
+     0,
+     -0.124,
+     0.05
+    ],
+    "yaw": 0,
+    "id": "b0",
+    "color": "blue",
+    "on": []
+   },
+   {
+    "type": "cube",
+    "pos": [
+     0,
+     0.009,
+     0.05
+    ],
+    "yaw": 0,
+    "id": "b1",
+    "color": "white",
+    "on": []
+   },
+   {
+    "type": "cube",
+    "pos": [
+     0,
+     0.141,
+     0.05
+    ],
+    "yaw": 0,
+    "id": "b2",
+    "color": "red",
+    "on": []
+   },
+   {
+    "type": "cube",
+    "pos": [
+     0,
+     -0.049,
+     0.15
+    ],
+    "yaw": 0,
+    "id": "b3",
+    "color": "yellow",
+    "on": [
+     "b0",
+     "b1"
+    ]
+   },
+   {
+    "type": "cube",
+    "pos": [
+     0,
+     0.083,
+     0.15
+    ],
+    "yaw": 0,
+    "id": "b4",
+    "color": "cyan",
+    "on": [
+     "b1",
+     "b2"
+    ]
+   },
+   {
+    "type": "cube",
+    "pos": [
+     0,
+     0.022,
+     0.25
+    ],
+    "yaw": 0,
+    "id": "b5",
+    "color": "orange",
+    "on": [
+     "b3",
+     "b4"
+    ]
+   }
+  ]
+ },
+ "oracle_order": [
+  "b0",
+  "b1",
+  "b2",
+  "b3",
+  "b4",
+  "b5"
+ ],
+ "start": [
+  {
+   "id": "b0",
+   "pos": [
+    0.5845544375632742,
+    -0.41823219928798916,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b1",
+   "pos": [
+    0.4395307522580782,
+    0.4317218311459044,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b2",
+   "pos": [
+    0.4650429408342879,
+    0.20641708027317685,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b3",
+   "pos": [
+    0.4850905104322768,
+    -0.24429563998644294,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b4",
+   "pos": [
+    0.6348234445150543,
+    0.2039304106250262,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b5",
+   "pos": [
+    0.5994157474506259,
+    0.38575910939191016,
+    0.05
+   ],
+   "yaw": 0.0
+  }
+ ],
+ "image": "scenes/dev/T3-dev-20.png",
+ "image_views": {
+  "main": "scenes/dev/T3-dev-20_main.png",
+  "top": "scenes/dev/T3-dev-20_top.png",
+  "robot side": "scenes/dev/T3-dev-20_robot_side.png",
+  "left side": "scenes/dev/T3-dev-20_left_side.png"
+ },
+ "image_multiview": "scenes/dev/T3-dev-20_multiview.png"
+}
