@@ -82,9 +82,7 @@ def build_model(blocks: list[dict], robot: bool = True, arm_block_collision: boo
             if g.contype or g.conaffinity:
                 g.contype, g.conaffinity = 1, 1
     spec.option.timestep = 0.002
-    # physics: None = MuJoCo defaults (pyramidal cone, impratio 1), which let stacked/grasped blocks creep: a cube on
-    # a cube with mu=0.9 slid 3.6 cm at 30 deg tilt. {"cone": "elliptic", "impratio": 10} (MuJoCo's advice for
-    # manipulation) cut that ~50x. Opt-in per method config (`physics:`) so experiments stay comparable.
+    # physics: None inherits the Spot XML defaults (elliptic cone, impratio 100); a method's physics mapping overrides them.
     if physics:
         if physics.get("cone") == "elliptic":
             spec.option.cone = mujoco.mjtCone.mjCONE_ELLIPTIC

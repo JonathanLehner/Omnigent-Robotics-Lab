@@ -74,17 +74,20 @@ def _smoothstep(phase):
 
 
 def _close_command(world, actuator, configured):
-    """Resolve the flagged maximum-grip command against the model ctrlrange."""
-    maximum = float(world.m.actuator_ctrlrange[actuator, 1])
+    """Resolve a configured grip command against the model ctrlrange."""
+    minimum, maximum = (
+        float(value)
+        for value in world.m.actuator_ctrlrange[actuator]
+    )
     if configured == "max":
         return maximum
     command = float(configured)
-    if not np.isclose(command, maximum):
+    if not minimum <= command <= maximum:
         raise ValueError(
-            "v3_grasp_hold requires grasp_close_command=max "
-            f"(model maximum is {maximum}, got {configured!r})"
+            "grasp_close_command is outside the model ctrlrange "
+            f"[{minimum}, {maximum}]: {configured!r}"
         )
-    return maximum
+    return command
 
 
 def _hold_step(world, arm_actuators, arm_dofs, joint_target):
