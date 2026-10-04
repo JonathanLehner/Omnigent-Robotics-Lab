@@ -46,10 +46,37 @@ def test_combo_configs_copy_cleared_component_blocks_verbatim():
 
     assert branch_a["perceive"] == v47["perceive"]
     assert branch_a["sumo"] == v2["sumo"]
-    assert branch_a["params"] == v47["params"]
+    assert {
+        key: value
+        for key, value in branch_a["params"].items()
+        if key != "placed_block_telemetry"
+    } == v47["params"]
+    assert branch_a["params"]["placed_block_telemetry"] is True
     assert branch_b["perceive"] == v5["perceive"]
     assert branch_b["sumo"] == v2["sumo"]
     assert branch_b["params"] == v2["params"]
+
+
+def test_h025_aware_is_an_opt_in_combo_variant():
+    control = pipeline.load_method("v6_combo")
+    aware = pipeline.load_method("v6_combo_aware")
+
+    assert aware["max_workers"] == 6
+    assert aware["stages"] == control["stages"]
+    assert aware["perceive"] == control["perceive"]
+    assert aware["sumo"] == control["sumo"]
+    assert aware["idealizations"] == control["idealizations"]
+    assert aware["params"]["placed_block_telemetry"] is True
+    assert aware["params"]["placed_block_monitor"] is True
+    assert {
+        key: value
+        for key, value in aware["params"].items()
+        if not key.startswith("placed_block_")
+    } == {
+        key: value
+        for key, value in control["params"].items()
+        if not key.startswith("placed_block_")
+    }
 
 
 def test_per_block_pose_errors_and_true_support_logging():
