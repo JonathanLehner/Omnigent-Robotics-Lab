@@ -50,6 +50,66 @@ Idealizations still in use by the best methods: oracle_block_pose (closed-loop c
 (4) X-022: v4_mpc T0 probe via Sumo, 24 eps, testing H-011.
 (5) X-014 remainder: v4_place, 157 eps, plus the x-shortfall fix for H-006.
 Held-out final evaluation: only on human approval.
+- **D-011** (PI), cites RS-017: Rung 2 (walking approach, v2_walk with w_heading=160) is CLEARED on the success target for T0 only: 16/16 = 1.00, Wilson 95% CI [0.81, 1.00], against a fresh matched v0 at 16/16 on the same commit 1f465a4 and fingerprint 0d729d0e (R-080 vs R-081, RS-017, reviewer ACCEPT). T1 is 4/4, too few episodes to count. H-014 and H-012 stay REFUTED on their XY mechanism clause: T0-dev-01 seed 6 ended its walk 3.50 cm off in XY, over the 3 cm limit, and the heading part held (max yaw 7.78°). Paired block error vs v0 has a median of −0.11 cm, so walking doesn't hurt placement today. That is only because the sumo_to_assembly_state_bridge and the scripted arm absorb the offset. v2_walk is therefore adopted as the rung-2 component with a known XY-drift risk. It will be combined with other rungs only after a walk XY fix is tested. Idealizations still in use for rung 2: oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, and a fixed nominal start and goal pose.
+  - rationale: The ladder counts a rung when the method meets >= 0.8 on the tier's dev scenes with a CI. The reviewer confirmed this for T0 independently of the mechanism clause. The pre-registered mechanism refutation still stands. It predicts a failure once the state bridge is removed, so the XY fix is the next rung-2 work rather than a blocker for other rungs.
+  - next: The planned order continues on one frozen commit, which robotics_engineer is preparing: X-043 (rung-4 MPC T0, 48 eps, Sumo), then X-045 (rung-5 off-grid, 144 eps) and X-042 (rung-3 lift grasp, 192 eps) in parallel, then X-044. In parallel, method_designer drafts a rung-2 successor hypothesis: a final XY settling term with the heading weight kept, tested from varied start poses. Rung 2 on T1 needs >= 16 episodes before it counts.
+- **D-012** (PI), cites RS-019, RS-018: RUNG 3 (real grasp) is PAUSED. H-010 is REFUTED (RS-019, reviewer ACCEPT, narrowly). v3_grasp_lift R-086 vs a fresh v3_grasp R-088, both at c733d69 with fingerprint 7f6eaa11: T0 36/48 [0.61, 0.85] and T1 0/48 [0.00, 0.074] in BOTH arms, against a pre-registered >=39/48 per tier. The lift was delivered: 0/96 episodes below 0.12 m achieved lift. This is the second failed fix on rung 3 (H-004, then H-010), so under lab policy rung 3 moves to proposed next experiments.
+RUNG 4: H-011 is OPEN as "not cleared; method-as-described untested". The reviewer REJECTED RS-018 as a refutation: the implemented Sumo pusher failed decisively (R-082 0/24 [0.00, 0.14] vs a fresh v0 R-083 24/24 [0.86, 1.00]), but it never grasped, contradicting its own weld_grasp / no_arm_block_collision idealizations. H-011's open status supersedes the "refutes H-011" field on RS-018. The v4_mpc idealizations list is wrong and must be corrected in the successor.
+  - rationale: Rung 3: H-010 was genuinely tested, and it failed on outcome. The post-hoc diagnosis (RS-019, labelled post-hoc by the reviewer) moves the defect from the retreat phase (RS-005) to finger-opening: the hand sinks ~5 cm and swings 3-4 cm, knocking the second block off the stack in 34/48 T1 episodes, and T0-dev-02 drops during carry (7 episodes). The lift adds 1.2-1.9 cm of lateral tip drift, which does slight harm (angle error 7.04° vs 5.61°). Two fixes have now targeted the wrong phase, so policy says to stop spending on this rung and climb elsewhere. Caveat: matched pairs end in identical poses, so each tier effectively has 6 scenes.
+Rung 4: the construct gap means no claim can be made about MPC placement with a weld grasp. The code-derived root cause (approach weight 6/m vs 220/m placement, 24 CEM samples, 1 iteration) is untested. The 0.87 cm smoke cited in H-011 ran on uncommitted code with default geometry, so it is not evidence.
+  - next: Running now and next: (1) X-046 (rung 2, H-016, walk XY settling): a 32-episode A-vs-B nominal screen, then the winner, v2_walk and v0 on 28 varied starts, on the walk-xy commit being frozen. (2) Rung 5: await review of RS-020; the successor anchors the measured layout to the table/world frame (it fixes the whole-structure lateral offset loss). (3) Rung 4: a successor of H-011 that matches its stated idealizations (weld attach, verified by smoke before the run) with approach shaping and per-step cost logging, T0 vs a fresh v0, on one frozen commit. PROPOSED, not run now: rung 3 v3_grasp_hold, which holds the hand pose (impedance/position hold) during finger-opening, opens slowly, and lifts with no lateral drift, tested on T0/T1 seeds 0-7 vs a fresh v3_grasp.
+- **D-013** (PI), cites RS-020: X-045 is VOID under H-015 rule A3. The reviewer REJECTED RS-020: the primary run R-084 itself has unmatched blocks with e=null (T3-dev-19 s1, T3-dev-20 s0). A3 says "any v46 episode", and my ruling to narrow it to Arm B came after the results were known, so it was unsound and is withdrawn. H-013 and H-015 stay OPEN, with neither supported nor refuted. Descriptive findings kept as exploratory, not confirmatory:
+- Arm B: v46 12/16 [0.51, 0.90] vs fresh v0 15/16 [0.72, 0.99], unresolved (McNemar p=0.375).
+- The white-block bridge fix held (0.16 cm and 0.83 cm).
+- A new failure mode: the measured layout is re-centred on y=0, losing the whole-structure lateral offset (3.9-4.8 cm), which accounts for all 4 Arm B v46 misses. T2-dev-23 is a perception error, not placement.
+Process: the unplanned duplicate v46 batch (R-085) can't enlarge the sample. Runner guard commit b42df27 now caps episodes per experiment.
+Also: H-017 is WITHDRAWN (superseded by H-018, the H-011 amendment). Do not run it.
+  - rationale: Pre-registered void rules bind as written. A3 cannot be narrowed after seeing results, even though missing-block episodes can never have a per-block e. That is a design flaw in A3 itself, to be fixed in the successor before any run, not patched now. Placement residual p was pre-registered as logged but was only derived afterwards, so it's exploratory. The anchoring defect is a clear, testable mechanism, and fixing it is the cheapest route to clearing rung 5 off-grid on T2.
+  - next: Rung 5 successor (method_designer): v47, which anchors the measured layout to the table/world frame instead of re-centring on y=0. Pre-register before any run:
+(a) a missing-block rule: an unmatched block counts as a perception failure with e reported as missing, and that does NOT void the experiment; void only if telemetry is absent for a MATCHED block;
+(b) per-block e AND placement residual p logged by the code;
+(c) cached=false on every episode;
+(d) a FRESH unseen confirmatory scene set, since T2-dev-20..23 and T3-dev-21..24 were inspected in RS-020, against a fresh matched v0 on one frozen commit, with one primary batch only.
+In parallel: X-046 stage 1 (rung 2) is running, and H-018 (rung 4) is being built on branch mpc-weld.
+- **D-014** (PI), cites RS-022, RS-021: RUNG 2 (walking approach, v2_walk) is now CLEARED on T1 as well as T0. RS-022 (reviewer ACCEPT): R-091 got 48/48 = 1.00 [0.926, 1.000] vs a fresh matched v0 R-092 at 48/48 on the same 48 pairs (T1-dev-01..12, seeds 100..147), same commit b42df27 and fingerprint 4995f230. Scope: this holds only under the current idealizations. sumo_to_assembly_state_bridge and perfect base-pose knowledge hide walk drift from placement: 1/48 walks ended with XY > 3 cm (3.19) and 2/48 with yaw >= 10° (max 12.15°), and all still succeeded. The missing separate pre-registration is a disclosed protocol deviation; the rule was fixed in D-011 and X-048 before the runs.
+RS-021 (rejected): H-016 stays OPEN. A (v2_walk_xy) is validly ineligible (seed 1 yaw -11.14°). B was not tested as filed; it is fixed on walk-xy2 at 54739a3 (linear 160 + quadratic 20000, with walk-end and post-settle telemetry logged separately), and the merge is pending a check of a walk-end divergence from v2_walk.
+  - rationale: The ladder target is met with a wide margin under a prospectively fixed rule and a matched fresh control. The walk-precision mechanism stays unresolved and matters only once the state bridge is removed. D-011's caution still stands: combining v2_walk with other rungs should follow the XY-fix test (the B re-screen). Rungs 1 and 2 are now cleared on T0 and T1, and rung 5 on T0 and grid-aligned T1, which makes a combined-rung method the natural next climb once the walk fix resolves.
+  - next: (1) X-046 stage-1 re-screen: A and B on the same 16 T0 pairs (seeds 0-15), both on the frozen merge of walk-xy2. If B is eligible, stage 2 runs on 28 varied starts vs v2_walk and v0. (2) v47 (rung 5, H-019) once built and through Gate 0: freeze, hash checks, 40 v47 + 16 fresh v0. (3) H-018 (rung 4) weld-carry MPC once the gate passes. (4) Then X-049, a combined rungs 1+2+5 method on T0 vs fresh v0, pre-registered first.
+- **D-015** (PI), cites RS-023: H-016 is REFUTED (RS-023, reviewer ACCEPT). X-053 tested both candidates as filed at 319a838, fingerprint 548aeccd, on the same 16 T0 pairs.
+- A (v2_walk_xy): ineligible, s1 yaw -11.14°. Success 16/16 [0.81, 1.00].
+- B (v2_walk_settle, linear 160 + quadratic 20000): ineligible. Post-settle, 8/16 walks have yaw >= 10° (max 36.7°); the settle phase adds +8.7° mean yaw [2.7, 14.7]; and the walk-end XY at s6 is 4.07 cm. Success 15/16 [0.72, 0.99]. Its failure (T0-dev-04 s9) comes from the settle turning the base ~40°, after which the arm misses by 19.5 cm.
+Stage 2 (varied starts) is cancelled. The walk-precision mechanism has now failed twice (H-012/H-014, then H-016), so under lab policy it moves to PROPOSED next experiments. Rung 2 itself stays CLEARED on T0 and T1 (D-011, D-014) under the current idealizations (sumo_to_assembly_state_bridge, fixed nominal walk start), which hide walk drift from placement.
+  - rationale: Adding position terms trades XY against heading: A's terminal-XY weight and B's settle phase each bring back yaw error. The original v2_walk (heading weight 160) has the best yaw but a 3.5 cm XY tail. No candidate meets both bounds, so further tuning without a new mechanism isn't warranted. The drift matters only once the state bridge or fixed start is removed, so it doesn't block climbing the other rungs. A combined method should use v2_walk as is, with the drift recorded as a known risk.
+  - next: PROPOSED, not run now: v2_walk_xy plus a terminal heading term (or a pose-tracking final step), screened on T0 seeds 0-15 and then on varied starts. Next run: X-051's verdict (v47, rung 5), then H-018 (rung 4) once its gate passes. After that, X-049: a combined rungs 1+2+5 method (support_sort + v2_walk + v47_vlm_anchor) on T0/T1 vs fresh v0, pre-registered first.
+- **D-016** (PI), cites RS-024, RS-025: RUNG 5 (structure from picture) is now CLEARED off-grid on T2 and T3, on top of T0 and T1. H-019 is SUPPORTED (RS-024 + RS-025, reviewer ACCEPT). v47_vlm_anchor at 319a838 (fingerprint 548aeccd):
+- confirmatory set (8 fresh off-grid scenes T2-dev-24, 25, 26, 28 and T3-dev-40, 42, 43, 44, seeds 0-1): 15/16 = 0.94 [0.72, 0.99];
+- T1: 24/24 [0.86, 1.00];
+- fresh matched v0: 15/16, the same single shared failure (T3-dev-42 s1, cap rotated 11.8° from the grasp/carry path, not perception).
+Median perception error is 0.09 cm, with per-scene mean <= 0.11 cm on large-offset scenes. The whole-structure lateral-offset defect from v46 is fixed. H-013 and H-015 are superseded by H-019.
+Caveats: n=16 per tier group and 8 scenes; v47 = v0 (superiority not required or claimed). New idealization: known_target_camera.
+Provenance: per E-015 (the human's independent check), the scene files were untracked at 319a838, so integrity rests on the E-011 pre-code hashes, the per-episode hash logs (32/32 match, E-014) and the 56/56 post-run rehash. E-013's "at frozen commit" wording is superseded and must not be repeated. The untracked dev scenes are being committed between experiments.
+H-020 branch selection: X-051 CLEARS, so H-020 runs BRANCH A (v6_combo: v47_vlm_anchor + support_sort + v2_walk + closed_loop_weld_place) on T0 and T1. This dated PI note fixes the branch before any freeze.
+  - rationale: This is the pre-registered absolute threshold, met with void rules V1-V3 all passing and reviewer acceptance. Rung 5 required >= 0.8 vs a matched control, not superiority. v47 has never run on T0, which is a disclosed risk for H-020. With rungs 1, 2 and 5 now all cleared alone, combining them is the next ladder step. Rungs 3 (paused after 2 failed fixes) and 4 (H-018 in build) stay as they are.
+  - next: H-020 / X-049 Branch A: v6_combo vs fresh v0, 48 T0 + 48 T1 pairs with per-episode fresh seeds (400-447, 500-547; the analyst verifies they're unused), on one frozen commit after the combo branch merges onto the scenes-tracked HEAD. In parallel: H-018 (rung 4) once its gate passes.
+- **D-017** (PI), cites RS-028: COMBINED method (rungs 1+2+5: v47_vlm_anchor + support_sort + v2_walk + closed-loop weld place) CLEARED on T0 and T1. H-020 SUPPORTED (RS-028 with analysis RS-027, reviewer ACCEPT). X-058 at 76cc1a7: v6_combo R-098 T0 48/48 [0.926,1.000], T1 48/48 [0.926,1.000]; fresh v0 R-099 96/96 on identical pairs. E-018 audit: V1-V4 pass. Placement -1.8 cm vs v0. No composition-penalty claim (both at ceiling; ~7-point penalty unresolved). R-097/X-055 exploratory and closed (runner cap bug). RUNG 4 PAUSED: H-011 construct-invalid (D-012); H-018 pre-run gate FAILED at 9cf673d (floor drag 2.38 cm > 1.0, forced release); two failed attempts, so it moves to proposed experiments.
+  - rationale: The pre-filed threshold was met on untouched seeds, with void rules audited. The reviewer found the post-R-097 revisions were frozen before R-098 and didn't affect the verdict. Rung 4 needs cost changes (release-band height term, sliding penalty, tighter target region) via a new amendment, so it's deferred under the two-failed-fixes policy.
+  - next: X-061: v0 / v2_walk / v6_combo on the same 96 T2/T3 pairs (seeds 2000-2047 / 2100-2147, E-019 PASS) at 76cc1a7, 288 episodes. Proposed, not run: H-018 successor (rung 4), v3_grasp_hold (rung 3), walk terminal heading term (rung 2 precision).
+- **D-018** (PI), cites RS-031, RS-030: FINAL DECISION; STOP (budget). The COMBINED method v6_combo (picture in via v47_vlm_anchor + support_sort order + v2_walk + closed-loop weld place) is now CLEARED on all four tiers. H-022 SUPPORTED (RS-031, reviewer ACCEPT narrowly): X-063 at 15686c1, R-103 T2 46/48 [0.860, 0.988], T3 48/48 [0.926, 1.000] vs fresh v0 R-104 46/48 and 47/48 on identical pairs. V1-V4 pass (E-022); no order failure; difference vs v0 unresolved (McNemar p=1.0). The earlier batch R-102 was void under V1 (procedural, git_head-only), so it's exploratory.
+Rung 2 standalone on T2/T3: H-021 PARTIAL (RS-029 + RS-030, ACCEPT). T2 44/48 passes; T3 42/48 doesn't clear. 9/10 failures are placement (6 shared with v0), 1 is walk-caused. H-021 stays open.
+Final ladder status:
+- rungs 0, 1 and 5 cleared T0-T3;
+- rung 2 cleared T0, T1, T2 (standalone), not T3 standalone, but cleared as part of the combined method on T2/T3;
+- combined 1+2+5 cleared T0-T3;
+- rung 3 (real grasp) and rung 4 (MPC placement) paused after two failed attempts each.
+Budget: 21 of 3000 episodes left, below the cheapest useful experiment (>= 96 episodes per matched arm pair), so the stop condition holds.
+  - rationale: Pre-registered absolute thresholds were met on audited, single-commit, fresh-seed matched runs. Caveats carried: superiority over v0 is not established; the 6-worker serial/parallel parity is shown on T0/T1 but not on T2/T3; and idealizations remain (oracle_block_pose for the placement correction, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, fixed_nominal_walk_start, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera). The scripted arm's placement tail is now the dominant failure on T2/T3.
+  - next: PROPOSED (needs new budget):
+(1) Rung 4: H-018 successor with a release-band height term, sliding penalty and tighter target region; gate re-run.
+(2) Rung 3: v3_grasp_hold, holding the hand pose during finger-open.
+(3) Placement tail: a closed-loop correction aware of previously placed blocks (T2-dev-12 s4023-type pushes), plus the regression of block error on bridged base height/roll/pitch.
+(4) Walk precision: a terminal heading term.
+(5) Perception: the white cube/brick misread (T2-dev-11 s4018).
+(6) The human-approved FINAL held-out evaluation of v6_combo (and v0 control) on T0-T3, if approved.
 
 ## Results
 
@@ -809,6 +869,730 @@ Independently, the PARTIAL rule requires median |e| <=1.0 cm and X-037 pre-regis
 3. The auto failure categorizer labels these as placement_error because block count and structure matched. Category counts alone would have pointed the next fix at placement, which is the wrong target.
 4. The per-block perceived y required by the pre-registration is not in the episode logs. e had to be inferred from pre-release poses.
 5. The Part A and Part B code differ (commit bb3a96c 'agent changes' between them). Not yet diffed.
+- **RS-017** runs R-080: 1.00 [0.84, 1.00] (n=20); R-081: 1.00 [0.84, 1.00] (n=20)
+  - interpretation: X-040, rung 2 (walking). v2_walk (w_heading=160) R-080 vs fresh v0 R-081. Both arms ran on the same 20 (scene, seed) pairs, at commit 1f465a4 with fingerprint 0d729d0e. Judged by H-014's pre-registered rule in order: VOID, NOT CLEARED, AT RISK, CLEARED.
+
+DATA SOURCE: per-walk values come from episodes.jsonl, walk_approach stage, terminal_base_pose. XY = base_position_error_m, which is planar; I checked this against the pose for s0. YAW is computed from the terminal base quaternion as atan2(2(wz+xy), 1-2(y^2+z^2)). The logged base_orientation_error_deg is total rotation including roll and pitch, so it is >= yaw (max 8.34 deg). Both metrics give the same verdict.
+
+1. VOID: does not fire.
+- Same git head 1f465a4 and the same workspace sha (e00db7b6) in both arms.
+- Runner fingerprint verified; preflight by robotics_engineer.
+- I could not run git status myself (the workspace is read-only). The commit tag is "+state", not "+dirty".
+- w_heading = 160.0 in lab/sumo_tasks/spot_walk_approach.py.
+- max_workers=1, sumo_deterministic=true.
+- All 20 pairs match the H-014 mapping. Yaw and XY are present for all 20 episodes.
+- DETERMINISM CHECK passes exactly, at 0 difference. The seed-0 terminal pose is bit-identical across T0-dev-01, T1-dev-01 and T1-dev-02. The same holds for seed 1 across T0-dev-02, T1-dev-01 and T1-dev-02.
+- render_rollout of s6 reproduced the same pose a third time.
+
+2. NOT CLEARED fires on clause (e). T0-dev-01 s6 walked XY = 3.50 cm, which exceeds 3 cm (dx = -0.39, dy = -3.48 cm). Under H-014, NOT CLEARED refutes amended H-012. Clauses (a) through (d) all pass:
+- (a) T0 16/16 (>= 15/16). Wilson 95% CI [80.6, 100]%. Effective n = 16 walks.
+- (b) 0/20 episodes with yaw >= 10 deg.
+- (c) Out-of-sample 14/14 (>= 13/14).
+- (d) No 'unreachable' failures. T1 4/4.
+
+3. AT RISK flags (moot, since NOT CLEARED fired first):
+- Max yaw 7.78 deg (s6) and 7.26 deg (s8), both >= 7.
+- XY 2.39 cm (s4), in (2, 3] cm.
+
+(i) YAW over the 16 distinct T0 walks, sorted (deg; IS = in-sample tuning seed):
+s3 0.73, s5 0.90, s7 1.48, s4 1.52, s1 1.93 IS, s0 1.97, s15 2.30, s2 2.40 IS, s12 2.87, s13 3.09, s9 3.85, s10 4.53, s14 5.05, s11 6.16, s8 7.26, s6 7.78.
+- Median 2.64, IQR [1.72, 4.79], max 7.78.
+- Count >= 5 deg: 4. Count >= 7 deg: 2. Count >= 10 deg: 0. Min margin to 10 deg: 2.22.
+- Out-of-sample n = 14: median 2.98, max 7.78, 0 >= 10.
+- T1 duplicates: s0 1.97 and s1 1.93, identical to the T0 walks.
+- Prediction "max < 5 deg" was wrong for 4/16 walks.
+
+XY over the 16 T0 walks (cm): s0 0.85, s1 0.83, s2 1.26, s3 1.22, s4 2.39, s5 0.22, s6 3.50, s7 0.80, s8 1.04, s9 0.84, s10 1.88, s11 0.79, s12 1.69, s13 0.88, s14 0.74, s15 0.60.
+- Median 0.86, max 3.50.
+- 1 walk > 3 cm; 2 walks > 2 cm.
+
+(ii) HEADING-FAILURE RATE: 0/16. Clopper-Pearson two-sided 95% upper bound 20.6% (one-sided 17.1%). Out-of-sample 0/14: 23.2% (one-sided 19.3%). The heading fix itself held, but n = 16 only bounds the failure rate at about 21%.
+
+(iii) PAIRED BLOCK ERROR, v2_walk minus v0, in cm (mean over blocks for T1):
+- T0: s0 -0.063, s1 -0.118, s2 -0.129, s3 -0.158, s4 -0.177, s5 -0.135, s6 +0.054, s7 -0.173, s8 -0.155, s9 -0.163, s10 -0.146, s11 -0.114, s12 +0.011, s13 -0.113, s14 -0.057, s15 -0.059.
+- T1: T1-01 s0 -0.101, T1-01 s1 -0.060, T1-02 s0 -0.107, T1-02 s1 -0.074.
+- Median -0.11 cm, 95% distribution-free CI [-0.146, -0.063] cm (order statistics 6 and 15 of 20, coverage 95.9%).
+- 18/20 pairs are negative; sign test p ~ 0.0004. This is well inside the +0.3 cm margin.
+- The H-014 reused-vs-fresh split does not apply: all 20 controls are fresh.
+
+(iv) Success: v2_walk 20/20, Wilson [83.9, 100]%; v0 20/20, same CI. The success difference is not resolved (n = 20 per arm, both at ceiling).
+
+CONCLUSION: the heading half of H-012 holds (no yaw >= 10 deg; the 77-179 deg mode is gone). The pre-registered "without hurting XY" clause is refuted by seed 6 at 3.50 cm, now on a clean, code-matched run. This replicates the diagnostic-only finding of RS-015 bit for bit (3.50 cm / 7.78 deg). The XY excursion did not hurt placement under the current idealizations.
+
+IDEALIZATIONS STILL IN USE: oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge (v0 adds fixed_base). Scope: fixed nominal start/goal pose only; robustness to start pose is untested.
+  - failures: Task failures: none (0/20 v2_walk, 0/20 v0; no failure categories). The walk is judged on mechanism. The worst walk is T0-dev-01 s6 (render_rollout R-080).
+- Terminal base offset: dy = -3.48 cm laterally, yaw 7.78 deg, roll/pitch about 2-2.2 deg. The walk still succeeds against its own 25 cm goal tolerance.
+- Codex on the contact sheet (prompts/analyze_rollout/v1): "slight lateral offset and mild yaw, subtle but visible in the overhead view; arm still reaches and completes the placement; no knocked or dropped block, no collision." Block error was 2.35 cm, compared with 2.29 cm for v0 on the same pair (+0.05 cm).
+- Category: walk_terminal_xy_tail. Lateral drift co-occurs with the larger yaw. The two largest yaws, s6 (7.78) and s8 (7.26), include s6, the only XY > 3 cm.
+- The cost function (w_position * |xy|, linear; w_heading * qz^2) has no terminal settle term. CEM with 24 rollouts over a 4 s horizon leaves a seed-dependent residual.
+- Second-worst XY is s4 at 2.39 cm, with only 1.52 deg yaw. So XY drift is not purely yaw-coupled.
+  - review: accept by reviewer: ACCEPT. R-080 (v2_walk) and R-081 (fresh v0) each contain the identical 20 explicitly listed (scene, seed) pairs, with the same full git head 1f465a4d..., workspace SHA e00db7b6..., and fingerprint 0d729d0e...; thus the baseline is present and matched. Every scene is T0-dev or T1-dev, and both runs have final_eval=false, so no held-out scene was touched. Recomputed metrics over both runs give 40/40 overall, 32/32 T0 and 8/8 T1, consistent with the per-run 20/20 and T0 16/16 summaries. For one arm, 20/20 has Wilson 95% CI [0.8389,1]; for the effective T0 walk sample, 16/16 has Wilson lower bound about 0.806, conventionally reported as 0.81. The treatment-control success difference is correctly described as unresolved because both arms are at ceiling with overlapping CIs. The paired block-error values reported in RS-017 have median -0.1135 cm (rounded -0.11) and the stated order-statistic interval [-0.146,-0.063] cm. Clean-tree provenance is adequate in the record: both run tags are +state rather than +dirty, their heads and complete captured workspace/native-extension fingerprints match, and RS-017 records a robotics_engineer preflight; the analyst's inability to invoke git does not negate the runner provenance. H-014 explicitly pre-registers 'walked yaw'; extracting planar heading from the terminal quaternion is the natural reading, whereas logged base_orientation_error_deg is total 3-D rotation. In any event both are below 10 degrees and lead to the same rule outcome. H-014 was created at 1791082442.82 and H-012 at 1791081214.05, before R-080 at 1791091549.43 and R-081 at 1791091589.19, so the tested clauses are pre-registered, not post-hoc. Applying the ordered rule as written is correct: VOID does not fire, then NOT CLEARED fires on 2(e) because the pre-registered any-episode criterion is violated by T0-dev-01 seed 6 at 3.50 cm > 3 cm; later AT RISK/CLEARED rules are moot. This justifies refuting H-014 and amended H-012's 'without hurting XY' mechanism, but not claiming a task-success harm or a population failure rate. The result properly lists the treatment idealizations and fixed nominal start/goal limitation (with fixed_base additionally identified for v0). Separately, the claim that rung 2 meets the T0 success target is justified: 16/16 with Wilson lower bound 0.806 (rounded 0.81) exceeds 0.80, independent of mechanism clause 2(e).
+  - surprise: 1. The X-035 seed-6 outlier replicated bit-exactly (3.50 cm, 7.78 deg) on a different commit and on a third re-render. The XY tail is a deterministic property of seed 6 under this cost, not noise. RS-015's VOID ruling therefore changed nothing about the walk itself; it only delayed the verdict.
+2. v2_walk placement is slightly better than fixed-base v0 in 18/20 pairs (median -0.11 cm, CI [-0.15, -0.06]). This holds even when the walk lands 3.5 cm off: the state bridge plus the scripted arm absorb the base offset. Under the current idealizations, the 3 cm walk-XY clause is a mechanism clause with no task consequence. It will matter once the bridge or scripted_arm idealization is removed.
+3. The logged 'base_orientation_error_deg' is total rotation, not yaw. Roll and pitch add up to about 3 deg (s1: 3.54 total vs 1.93 yaw). Future thresholds should name the metric explicitly.
+- **RS-018** runs R-082: 0.00 [0.00, 0.14] (n=24); R-083: 1.00 [0.86, 1.00] (n=24)
+  - interpretation: X-043 / H-011 (rung 4, v4_mpc vs fresh v0, T0-dev-01..06 x seeds 0-3, 24 pairs). The two runs are comparable: R-082 and R-083 share git c733d69, fingerprint 7f6eaa11, workspace_sha256 94b8f00f, the same 45-entry workspace_files list in the same order, and the same two Sumo native .so sha256s. The (scene, seed) pairs are identical.
+RESULT: v4_mpc 0/24 = 0.00 (Wilson 95% CI [0.00, 0.14]) vs v0 24/24 = 1.00 [0.86, 1.00]. The success difference is -100 pp (Newcombe 95% CI about [-100, -79] pp). Median block position error is 45.0 cm vs 2.36 cm (difference of medians +42.6 cm); median angle error is 4.3 vs 2.1 deg. Every v4_mpc episode is above 3 cm (min 4.1 cm, max 63.0 cm). With n=24 per arm and zero overlap, this gap is resolved.
+PRE-REGISTERED RULE, applied in order:
+(1) VOID: no. bridge_snaps_to_goal=false. The lab block is teleported to the Sumo terminal free-joint pose (handoff 0.0 cm / 0.0 deg; post-transfer drift ~0.007 cm). The goal is set per scene from the spec (scene_object_goal_pose), and the Sumo echo matched within 1e-9, so there are no sumo_object_goal_mismatch failures. All six T0 scenes happen to share the goal [0.85, 0, 0.05].
+(2) NOT CLEARED: yes. There are 24/24 failures and 24/24 blocks > 3 cm. Stop here; AT RISK, CLEARED and IMPROVES are not evaluated.
+=> H-011 is NOT CLEARED, so H-011 is refuted.
+TIMING: each episode ran 201/201 MPC steps at max_opt_iters_per_step=1. Planning took about 12.4-13.5 s per episode (wall 13-14 s) against the 600 s timeout, so this is not a compute-budget or timeout failure.
+DIAGNOSIS (4 rollouts inspected: Sumo episode logs plus codex on the contact sheets):
+(a) This is not a placement: the Sumo task (SpotBoxPush subclass) never grasps. The block moves only when the arm or body pushes it, and it never lifts (terminal z 0.04996 in every inspected episode).
+(b) T0-dev-04 s2: the block is untouched; terminal equals start to 1e-13 m. The base walked from (-0.03, 0.96) to (0.74, 0.78) and yawed about 60 deg off its approach heading. codex: 'gripper never contacts'.
+(c) T0-dev-01 s0: the block moved 0.26 cm (incidental). The base walked to (0.77, -0.93), 113.6 deg off heading, and never reached the block. codex: 'never visibly contacts'.
+(d) T0-dev-03 s0 (best case, 4.1 cm): the block was pushed 0.42 m and overshot to (0.882, -0.026) at 5.6 deg. The base ended at x=1.52, past the goal. codex: 'pushed by arm/gripper, overshoots'.
+(e) T0-dev-05 s2 (worst, 63 cm): the block was pushed the wrong way, from (0.424, 0.341) to (0.393, 0.433), and spun 52 deg.
+CEM COST TRAJECTORY: not available. run_task.py logs only per-episode mean_reward, with no per-step cost. Mean reward was -117 (untouched), -124 (untouched), -128 (pushed away) and -61 (near miss). An untouched block at about 0.47 m contributes a constant 220*0.47 = 103 to the placement term, so the reward is dominated by a term that stays flat until contact.
+LIKELY ROOT CAUSE (from code reading; not tested by ablation): the cost gives CEM almost no gradient toward contact. reset_pose puts Spot 0.8 m behind the block on the start->goal line, so the gripper must travel about 0.8 m before the 220/m placement term changes at all. The only approach shaping is w_gripper_object = 6/m (37x weaker than placement) plus gripper height. With 24 samples, 1 CEM iteration per control step and a 2 s horizon, most sampled rollouts never touch the block. The planner then drifts or wanders (base yaw errors of 60-115 deg) or pushes off-axis. When it does make contact, nothing in the cost stops the push at the goal, which explains the overshoot. Scene geometry is a further factor: T0 starts are about 0.43-0.55 m from the goal at about ±35 deg off the x axis, while the task's default smoke geometry is an on-axis push along the robot's +x.
+THE 0.87 cm SMOKE: X-043 feasibility cites 'smoke 0.87 cm', and H-011 cites artifact sumo-1791077387-spot_block_mpc_place, which is not a lab record. Its timestamp 1791077387 falls between commit 911b67d (1791062260) and 5c3f808 (1791082914, 'agent-built stages, Sumo tasks'). It therefore ran on an uncommitted working tree that no commit pins, so its task cost, CEM budget, v4_mpc.yaml and bridge cannot be recovered or diffed against c733d69 from the record. Two facts in the current code weaken it as evidence. (i) The direct run_task path uses the task defaults (block start (-0.45, 0), on-axis), not the pipeline's per-scene start/goal/size/mass, and the bridge goal-echo guard did not exist on that path. (ii) The v4_mpc.yaml comment states that a 6 s smoke 'covered only 0.262 m' of the 0.472 m T0-dev-01 move. This contradicts a 0.87 cm placement on T0-dev-01 geometry. A probable explanation is that the 0.87 cm figure came from a different start/goal (or from the success tolerance applied at a different geometry), not from the T0 scenes. This is unverified: with read-only access I could not run git diff, and the artifact file was not found.
+IDEALIZATIONS STILL IN USE: oracle_structure_spec, oracle_build_order, oracle_block_pose (Sumo reads the true block state), sumo_to_assembly_state_bridge (teleport), a public Sumo box proxy for block dynamics, and a lab-world fixed_base (the Sumo base actually walks; its pose is not transferred). LISTED BUT NOT IN EFFECT: 'weld_grasp' and 'no_arm_block_collision'. In Sumo the arm collides with the block and nothing is welded; this is why the method pushes.
+  - failures: All 24 are tagged mpc_place_failed. Split by terminal block error (each block starts about 0.43-0.55 m from the goal):
+- NO PROGRESS / NEVER CONTACTED, or pushed away (>40 cm): 14/24. T0-01 s0,s1,s3; T0-02 s1,s2,s3; T0-04 s0,s2; T0-05 s1,s2,s3; T0-06 s0,s1,s3. Visually confirmed: T0-04 s2 and T0-01 s0 untouched (the base wanders 60-115 deg off heading); T0-05 s2 pushed the wrong way and spun 52 deg (63 cm).
+- PARTIAL PUSH (10-40 cm): 7/24. T0-02 s0 36.0, T0-03 s2 39.1, T0-03 s3 19.7, T0-04 s1 21.5, T0-04 s3 36.3, T0-05 s0 23.0, T0-06 s2 30.4.
+- PUSHED NEAR GOAL BUT OUT OF TOLERANCE (<10 cm): 3/24. T0-03 s0 4.1 (overshoot, 5.6 deg; visually confirmed), T0-03 s1 7.1, T0-01 s2 9.0.
+- Zero bridge, handoff, settle-drift, goal-mismatch, fall, or timeout failures.
+The 14 / 7 / 3 split comes from error bands, not from per-episode contact flags. Contact was confirmed visually in only 4 episodes.
+  - review: reject by reviewer: REJECT the claimed H-011 refutation; accept only the narrower empirical finding that the implemented v4_mpc Sumo task failed on this matched T0 dev set. A fresh baseline is present: R-083 v0 uses exactly the same six T0-dev scenes, seeds 0-3, commit/workspace fingerprint 7f6eaa11, and 24 (scene,seed) pairs as R-082. Both runs are final_eval=false and list only dev scenes, so no held-out scene was used. The run summaries and RS-018 agree: R-082 is 0/24 with Wilson 95% CI [0.000,0.138], R-083 is 24/24 with [0.862,1.000], failures are 24 mpc_place_failed versus none, and recomputing both runs pools to 24/48 overall as expected. The arm-level intervals do not overlap, all 24 pairs are discordant in the same direction, and H-011's preregistered any-failure NOT CLEARED rule is decisively triggered for the implementation that ran. H-011 was created before R-082, so the outcome rule is preregistered rather than post-hoc. However, construct validity is decisive: H-011 describes/lists weld_grasp and no_arm_block_collision, while R-082's Sumo task has neither a weld grasp nor disabled arm-block collision; it performs non-prehensile pushing and never lifts the block. Those are not residual idealizations but absent defining mechanics. Therefore the run did not test the method as described by H-011, and H-011 should be 'not cleared / method-as-described untested,' not 'refuted.' RS-018 appropriately discloses the mismatch and distinguishes listed-but-not-in-effect idealizations, but its final inference still overclaims. The cited 0.87 cm smoke does not rescue validity: it ran on an uncommitted, unrecoverable tree with default/on-axis geometry and cannot be tied to the frozen per-scene treatment; it is at most weak feasibility evidence and does not invalidate the current run's measured failures. The proposed cause (approach shaping 6/m versus placement 220/m, 24 CEM samples, one iteration) is appropriately labeled in RS-018 as a likely root cause from code reading and explicitly 'not tested by ablation'; it must remain a hypothesis, not a demonstrated causal result. Scope must also remain these six dev scenes—the 24 episodes are four seeds per scene, not evidence for broad scene-population or real-world performance.
+  - surprise: 1) v4_mpc is labelled weld_grasp + no_arm_block_collision, but the Sumo task neither welds nor disables arm-block collision: it is non-prehensile pushing. So the method under test differs from the one H-011 describes, and the run's idealization list is wrong. 2) The '0.87 cm smoke' behind X-043 feasibility is untraceable. It ran on an uncommitted tree before 5c3f808 and is contradicted by the method's own yaml note ('6 s smoke covered only 0.262 m'). 3) Compute was not the limit: about 13 s of the 600 s budget was used, with 1 CEM iteration per step. The cheap levers (opt iterations, rollouts, approach weight) were left at their minimums.
+- **RS-019** runs R-086: 0.38 [0.28, 0.47] (n=96); R-088: 0.38 [0.28, 0.47] (n=96)
+  - interpretation: X-042 (H-010 + 05:33 UTC amendment). R-086 v3_grasp_lift vs R-088 fresh v3_grasp control, same commit c733d69+state.7f6eaa11, identical fingerprint 7f6eaa11, same 96 (scene, seed) pairs.
+
+1) DID THE LIFT TAKE EFFECT? YES. This is not a wiring bug. In R-088, release_vertical_lift_m=0.0 and the tip-lift displacement is [0,0,0] on every release checked. In R-086, release_vertical_lift_m=0.15 and the achieved tip z-lift is logged on every release event. Pre-lift trajectories are bit-identical across arms (checked pair by pair on T1-dev-01 s1, T0-dev-02 s1 and T1-dev-02 s0: pre_release error and open-phase displacements match to about 1e-15 m). The arms diverge only after the open phase, which is expected. So the release phase differs, and H-010 was actually TESTED.
+
+2) ACHIEVED LIFT (amendment A1 gate): logged per release event (release_tip_lift_displacement_xyz_m.z) on all 96 episodes / 144 release events. Episodes with achieved lift < 0.12 m: 0/96. Distribution: nominal 0.1299 to 0.1307 m. The lowest values are on grasp-failure episodes: 0.1202 (T1-dev-03 s4 b0, slip), 0.1226 (T0-dev-02 s7), 0.1237 (T0-dev-02 s1), 0.1257 (T1-dev-03 s2), 0.1277 (T1-dev-03 s6). The gate is satisfied, so the mechanism variable was delivered.
+
+3) OUTCOME. T0: 36/48 = 0.75, Wilson 95% [0.61, 0.85], vs control 36/48 [0.61, 0.85]. T1: 0/48 = 0.00, Wilson 95% [0.00, 0.074], vs control 0/48 [0.00, 0.074]. Effect size Δ = 0.00 in both tiers. The unpaired Newcombe CI for the T0 difference is about ±0.17. Paired, there are no discordant outcomes in the matched pairs inspected, and failure counts are identical (placement_error 46, drop 11, slip 8). Effective n = 6 scenes per tier. Both pre-registered thresholds fail (T1 needs ≥39/48, got 0; T0 needs ≥39/48, got 36). The T0-dev-02 scope exemption does not apply, because 5 T0 failures are placement errors outside dev-02.
+
+4) MECHANISM CHECK FAILS, and it fails upstream of the intervention. In episodes that reach release without a drop (85/96), the block is already displaced ≥1.8 cm during the FINGER-OPEN phase, which runs before the lift. Ranges: 1.8 to 7.4 cm for the first block, 15 to 39 cm for T1's second block. Fewer than 2/85 meet the <1 cm criterion (needed ≥90%). In the control, the retreat phase moves a seated block by only about 1e-7 m. The 'jaw drags the block during lateral retreat' defect that H-010 targets does not exist at this commit. Matched-pair example T1-dev-02 s0, b1: open displacement 24.9 cm in BOTH arms, and the final rest position is 1.1463 vs 1.1464 m. The block tumbles off b0 the moment the jaw opens, and the lift cannot undo that.
+
+5) LATERAL TIP DRIFT DURING LIFT: confirmed. Tip x-drift is -1.29 cm on first-block lifts and -1.16 cm on second-block lifts. Max lateral deviation is 1.41 to 1.91 cm across all 144 lift events, consistent with robotics_engineer's 1.4-1.7 cm. Effect: on 20 of the T0 successes the lift drags the seated block 0.1 to 1.36 cm (max T0-dev-06 s3). In 2 T1 episodes (T1-dev-04 s1 and s4) the lift itself pulls b1 off the stack (9.6 and 10.3 cm). This is the most likely source of the median angle-error shift, 7.04° (lift) vs 5.61° (control). It changed no T0 outcome. It is a small adverse side effect, not a benefit.
+
+VERDICT: H-010 is REFUTED as pre-registered, with a valid test (lift delivered on 96/96). The deeper finding is that its causal premise (inherited from RS-005) is wrong: the release disturbance occurs at jaw-open, not at retreat.
+
+Idealizations still in use: oracle_structure_spec, oracle_build_order, oracle_block_pose, fixed_base, scripted_arm. Default physics (no elliptic cone or noslip). Flag: T1-dev-01 s1 was seen before the run (amendment A3). It fails in both arms and does not change any verdict.
+  - failures: Primary failure category per episode, lift arm R-086 (control R-088 has identical totals). Episodes with two labels (drop+slip) are counted under drop.
+T0 (12 failures / 48):
+- Transit drop/slip on T0-dev-02: 7/8 (drop s1, s2, s3, s4, s6; slip s5, s7). Pre-release, outside H-010 scope, as predicted. Codex on the T0-dev-02 s1 contact sheet: 'brick slips from the gripper during transit ... drops beside the base before commanded release; release lift causes no visible additional disturbance'. Logs agree: pre-release error 10.6 cm; the lift added only 0.9 cm.
+- Placement error from the finger-open push: 5 (T0-dev-03 s1; T0-dev-05 s1, s3, s6, s7). The block is pushed 5.4 to 7.4 cm in +x while the fingers open. The lift adds about 0.
+T1 (48 failures / 48):
+- b1 knocked off the stack DURING FINGER OPEN: 34. Displacement 14 to 39 cm with z falling 9 to 11 cm, so b1 ends on the table, usually flipped 180°. On b1 the tip moves -3.2 to -4.2 cm in x and -5 cm in z during the open, with 3-4 kN body-contact force: the opening jaw strikes the block.
+- b1 pulled off by the LIFT itself (lateral tip drift): 2 (T1-dev-04 s1, s4).
+- Stack intact, but b0 or b1 pushed 4 to 10 cm by the open: 5 (T1-dev-02 s3, T1-dev-04 s6, T1-dev-06 s0, s2, s4).
+- Transit drop/slip of b0 or b1 (T1-dev-03 s1 to s7): 7.
+Visual check, codex on the T1-dev-02 s0 contact sheet: 'b1 is displaced mainly while the fingers open, before the vertical lift ... During the lift the tip rises nearly vertically with no clear lateral drift.' The 1.2-1.9 cm drift in the logs is below what the contact sheet can resolve.
+Shared root cause for 39/41 T1 placement errors and 5/5 T0 placement errors: block contact during finger opening. The hand also drops about 5 cm in z during the open on every release, so the arm is not holding pose while the jaw opens.
+  - review: accept by reviewer: ACCEPT, narrowly. H-010 was preregistered before the evaluated runs: H-010 was created at 1791077674.617841 and its lift amendment at 1791092021.606619, both before R-086 at 1791093750.383302 (and R-088 at 1791094005.408707). The amendment disclosed the earlier T1-dev-01 s1 smoke observation and left the thresholds unchanged. The achieved intervention—not merely its command—was recorded on every treatment release, with 0/96 episodes below 0.12 m, while the fresh control recorded zero lift. Therefore the intervention was delivered and H-010 is tested, not untested. The fact that the defect inherited from RS-005 is absent at c733d69 makes the causal premise wrong on these scenes; it does not erase the preregistered outcome test. T1 decisively refutes the >=39/48 prediction: 0/48 with Wilson 95% CI [0,0.074], far below 0.8. T0 alone would be less decisive because 36/48 has CI [0.61,0.85], but H-010's T1 prediction is independently falsified and its preregistered mechanism gate also fails (<2/85 under 1 cm versus >=90% required).
+
+The baseline/control is valid: R-088 is a fresh v3_grasp run at the same git head/workspace fingerprint as R-086 and contains exactly the same twelve dev scenes, seeds 0-7, and 96 matched (scene,seed) pairs. Both runs are final_eval=false and list only T0-dev/T1-dev scenes; no held-out scene appears. Independent recomputation gives 192 episodes, 72/192 successes, pooled Wilson CI [0.3096,0.4453], tier totals T0 72/96 and T1 0/96, and failure labels drop=22, slip=16, placement_error=92. These exactly equal the sum of the two run records; the per-arm summaries embedded in RS-019 also match each run (36/48 T0, 0/48 T1, total 36/96, and identical category totals). Episode-level Wilson CIs are reported.
+
+The effective sample-size limitation is disclosed: only six scenes per tier are independent geometry units, so the null treatment-control difference must not be generalized beyond these dev geometries. In particular, identical totals and categories do not by themselves establish pairwise trajectory equivalence or prove a population effect of exactly zero. The cited three-pair trajectory comparison is insufficient to support the blanket sentence that all pre-lift trajectories are bit-identical, and it cannot exclude every conceivable wiring defect. It is nevertheless unnecessary to the decisive wiring question here: per-release telemetry across all 96 treatment episodes/144 release events, paired with zero lift in control, establishes that the intended lift branch executed and crossed the amended gate. The no-benefit comparison should be read as no detected benefit on these dev scenes, not as a precise general effect estimate.
+
+The corrected phase attribution is acceptable as a post-hoc diagnosis, not a newly preregistered population claim. The aggregate phase logs place the large disturbance during finger opening before lift and report negligible seated-block movement during control retreat; the three matched trajectory exemplars corroborate rather than independently prove that diagnosis. Thus RS-005's retreat-specific attribution is undermined, while its outcome conclusion remains intact. Remaining idealizations are explicitly listed and match both run records: oracle_structure_spec, oracle_build_order, oracle_block_pose, fixed_base, and scripted_arm, with default physics. The accepted conclusion is limited to refuting H-010's preregistered prediction under these idealizations and these six dev scenes per tier.
+  - surprise: 1) The defect H-010 targets does not exist at c733d69. In the control, the lateral retreat moves a seated block by about 1e-7 m. All the post-release damage happens during FINGER OPEN, before any lift or retreat. RS-005's attribution ('open jaw moves sideways along the tool axis before it clears and drags the block 20-40 cm') had the wrong phase. RS-005's mechanism claim should be re-examined, though H-004's refutation still stands on outcome.
+2) The hand sinks about 5 cm in world z and, on b1, swings 3-4 cm in -x while the fingers open, with 3-4 kN body contact. This looks like the arm's tracking sag once grip force is released, and it is the prime suspect.
+3) The vertical lift is mildly harmful. Its 1.2-1.9 cm lateral tip drift drags seated blocks up to 1.4 cm and pulls b1 off the stack in 2 T1 episodes. This plausibly explains the median angle error rising from 5.61° to 7.04° with identical success.
+4) Matched pairs end in the same final pose to within about 0.2 mm, so the comparison is effectively deterministic: n=48 per tier measures 6 scenes, not 48 independent draws.
+- **RS-020** runs R-084: 0.89 [0.80, 0.94] (n=72); R-085: 0.88 [0.78, 0.93] (n=72); R-087: 0.89 [0.80, 0.94] (n=72)
+  - interpretation: X-045 (rung 5; H-013 as amended by H-015 and its Arm B note). VERDICT: PARTIAL. Not supported, not refuted.
+
+PROVENANCE. All three runs use commit c733d69 and fingerprint 7f6eaa11 with the same workspace sha 94b8f00f. Both v46 runs are complete 72-pair batches (72/72 episodes, the same pair list). Run order by fingerprint captured_at: R-084 at 05:47:42 (dir 1791092875), then R-085 at 05:52:18 (dir 1791093149), then v0 R-087 at 06:02:30. By the pre-committed rule, R-084 is PRIMARY and R-085 is the REPLICATE. Process flag: X-045 planned 144 episodes but 216 were run. The runner's planned-episode guard counts unique (scene, seed) pairs per method, so it did not block a duplicate v46 batch. Why a second v46 batch was launched is not recorded.
+
+ARM B (confirmatory; T2-dev-20..23 and T3-dev-21..24, seeds 0-1, n=16 per arm):
+- v46 R-084 (primary): 12/16 = 0.75, Wilson 95% [0.51, 0.90].
+- v46 R-085 (replicate): 12/16, the same pass/fail on every pair.
+- v0 R-087: 15/16 = 0.94 [0.72, 0.99].
+- Paired v46 vs v0: 11 both pass, 0 both fail. 4 pairs favour v0 (T2-dev-20 s0/s1, T2-dev-23 s0/s1) and 1 favours v46 (T3-dev-21 s1, a 4.5 cm v0 placement miss). Exact McNemar p = 0.375.
+- Effect: -18.8 pp, Newcombe 95% CI about [-44, +8] pp. With n=16 per arm the difference is NOT resolved, but the pre-registered threshold (>= 14/16) is missed.
+- Scene level (both seeds pass): v46 6/8, v0 7/8.
+- Descriptive, without T3-dev-24 (B4 ii): v46 10/14, v0 13/14. T3-dev-24 passed only narrowly (blocks 1.8-2.2 cm off with e of about +2 cm).
+- B4(i) caveat: T3-dev-22 reuses the T2-dev-22 pier positions, so the two are not independent pier tests. They also give identical e patterns.
+Band: 12 falls in 11-13, so PARTIAL. No REFUTED clause fires (> 10/16; T1 24/24 in both v46 runs; Arm B median |e| 0.83 cm, not > 1.5). SUPPORTED fails: 12 < 14, and the failing blocks have |e| of 3.9-4.8 cm, not <= 1.5.
+
+MECHANISM (H-015 A2, Arm B). Per-episode telemetry exists in runs/<dir>/episodes.jsonl under perceive.block_position_errors: perceived y, true y, and e for every block.
+- cached=false and cache_mode=fresh_per_seed in all 32 Arm B v46 episodes. Arm A episodes were not individually inspected for this flag.
+- The placement residual p is NOT logged as a field. I derived it from final_pose minus perceived target.
+- Arm B, R-084, 29 blocks per seed. Seed 1 e equals seed 0 e on every block, because the geometric step is deterministic on the same image.
+- Median |e| = 0.83 cm, which misses the <= 0.7 cm prediction. Max |e| = 4.8 cm, which misses the <= 1.5 cm prediction. 10/29 blocks are > 1.5 cm.
+- Per scene |e| (cm): T2-20: 3.9, 3.9, 3.9. T2-21: 0.27, 0.07, 0.16. T2-22: 0.31, 0.89, 0.54. T2-23: 4.8, 4.3, 4.4. T3-21: 0.0, 0.39, 0.2, 0.2. T3-22: 0.37, 0.83, 0.6, 0.66. T3-23: 1.83, 1.1, 0.37, 1.1, 0.48, 0.83. T3-24: 2.0, 1.96, 2.07.
+- White-on-bridge clause (B3, clarified): the T2-dev-21 white brick span has |e| 0.16 cm in both seeds, both runs. The T3-dev-22 white cube pier has |e| 0.83 cm in both seeds, both runs. Both are <= 1.5 cm, so the clause PASSES and the white-mask fix (A1) holds on the pre-registered bridge blocks.
+- Two other white blocks are off: the T2-dev-20 white cube by 3.9 cm (a column base, not a bridge) and the T3-dev-24 white brick by 2.0 cm. In those scenes every block shares the same offset, so the error is not specific to white.
+
+VLM NONDETERMINISM (R-084 vs R-085, same frozen code):
+- Arm B: outcome agreement 16/16. VLM response hashes differ on 10/16 pairs. The parsed structure changed materially on 1/16 (T2-dev-20 s0: white cube read as white brick).
+- All 72 pairs: 5/72 discordant outcomes = 6.9%, Wilson [3.0%, 15.3%]. All 5 are in exploratory Arm A: T2-dev-11 s0 and T3-dev-16 s0/s1 fail only in R-085, T3-dev-19 s1 and T3-dev-20 s0 fail only in R-084. Net 64/72 vs 63/72. Every discordance is a VLM structure error (mismatch/missing block).
+- Whenever the parse matched, the measured e was identical across runs. The nondeterminism enters only through the VLM structure parse.
+- Pooled v46 (144 episodes): 0.88 [0.82, 0.92]; T1 48/48.
+
+ARM A (descriptive only):
+- v46 R-084 52/56 vs v0 R-087 49/56.
+- T1 24/24 for v46 in both runs and for v0.
+- T2-dev-16, where the white-cube failure was originally found, now passes both seeds. T2-dev-18 still fails both seeds with a 3.7-3.8 cm block (labelled placement_error; e not inspected).
+
+IDEALIZATIONS STILL IN USE: oracle_build_order, oracle_block_pose (the closed-loop correction reads sim truth), fixed_base, weld_grasp, no_arm_block_collision, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer. scripted_arm is listed in H-013. v0 additionally uses oracle_structure_spec.
+  - failures: ARM B, v46 R-084 (4 failures, 2 scenes x 2 seeds), by root cause, not by the runner's label:
+
+(1) PERCEPTION: loss of the absolute structure offset (4/4 failures; all labelled 'placement_error' by the classifier, which is a mislabel).
+- T2-dev-23 s0/s1: the true y of the 3 blocks is -10.8, +1.7, +1.7 cm, and the measurement read them as -6.0, +6.0, +6.1 cm. e = +4.8, +4.3, +4.4 cm.
+- The placement residual p is -0.4, -0.4 and +0.03 cm. The arm hit its commanded targets.
+- The same 4 cm miss on both seeds is deterministic perception, not placement.
+- Visual check (codex, contact sheet rollout_T2-dev-23_s0.png): 'correct green-orange base with red on top of orange, shifted sideways as a whole... perception/target-localization error, not failure of the arm to reach its commanded target.'
+- T2-dev-20 s1 (and s0 in R-084): true y is -2.1, +9.9, -2.1 cm and perceived y is -6.0, +6.0, -6.0 cm, so e = -3.9 cm on all 3 blocks. On top of that, placement added p of about -2.2 cm (white) and -1.7 cm (orange). The b0 closed-loop correction stalled at 1.9-2.3 cm remaining (H-006 stall).
+- Codex said the white block was 'not visibly pushed', which matches the stall reading: a residual, not a collision. The 2 cm residual was not visible to codex. The final errors were 6.1, 6.1 and 4.0 cm.
+- So T2-dev-20 is perception (dominant) plus placement.
+- Pattern across Arm B: the measured layer-1 blocks are always placed symmetrically about y=0 (±6.0, ±6.8, ±8.4, ±11.8 cm), or a single base block is put at 0. The measurement registers lateral position relative to the structure's own extent, not to the world/target frame. Scenes whose structure centre is off zero therefore get a common-mode shift equal to that centre offset: T2-20 3.9 cm, T2-23 4.5 cm, T3-24 2.0 cm (passed narrowly), T3-23 1.1-1.8 cm (passed).
+- fallback_blocks=0 in all of these, so the telemetry does not flag the snapping.
+
+(2) PERCEPTION, structure parse (replicate R-085 only): T2-dev-20 s0.
+- The VLM labelled the white cube a 'white_brick'. It was unmatched (true_id null, e undefined), so the white cube was never placed (final pose (0.50, 0.32) is its spawn pose). The purple cube placed on top had no support and fell on its side (ang_err 90 deg).
+- Labels: perception_mismatch plus perception_missing_block.
+- The episode would have failed anyway through (1). Shown in the original video runs/1791093149_v46_vlm_measure/T2-dev-20_s0.gif.
+- CAVEAT: render_rollout re-calls the VLM. The re-render of this episode received the 'white cube' parse (response 3351c3...) and reproduced failure mode (1), not the missing block, so it is not a faithful replay for VLM methods. The codex inspection of that contact sheet therefore covers mode (1).
+
+ARM B, v0 R-087 (1 failure): T3-dev-21 s1, a placement_error with one block at 4.5 cm.
+
+ARM A (exploratory):
+- v46 R-084: T2-dev-18 s0/s1 placement_error (3.7-3.8 cm). T3-dev-19 s1 and T3-dev-20 s0 perception mismatch/missing block (VLM structure).
+- v46 R-085: T2-dev-11 s0 and T3-dev-16 s0/s1 perception mismatch/missing block. T2-dev-18 s0/s1 as in R-084.
+- v0: 7 placement_error.
+
+VOID check (A3): fingerprints are identical and cached flags and reading hashes are present in Arm B. One replicate block (R-085 T2-dev-20 s0) has no e because it was unmatched. A3 literally requires per-block e on every v46 episode. I did NOT apply VOID: the primary run has e on all Arm B blocks, and e is undefined for an unmatched block. The PI should rule whether unmatched blocks trigger A3, and whether the same applies to the Arm A missing-block episodes in R-084.
+  - review: reject by reviewer: REJECT. The outcome arithmetic and the matched-control comparison are correct, but the preregistered VOID condition A3 is violated in the declared PRIMARY run, so RS-020 cannot carry a confirmatory PARTIAL verdict. H-015 A3 says VOID if “any v46 episode” lacks “per-block e”; it is not limited to Arm B. Direct inspection of R-084 shows two primary-run episodes with missing true blocks and null e: T3-dev-19 seed 1 has perceived yellow_1 with true_id=null and error=null, and T3-dev-20 seed 0 has cyan_middle with true_id=null and error=null. Thus the proposed PI ruling is unsound on its own premise: R-084 does not have e for every block. Treating a missing/mistyped block as an episode failure is scientifically sensible, but it does not retrospectively satisfy or narrow the explicit telemetry-based VOID rule. The same reasoning also means the unmatched R-085 T2-dev-20 seed 0 block lacks e, although R-085 need not be the primary analysis.
+
+A2 is also not complied with as written: placement residual p was preregistered as a logged metric for every block, but no p field was logged. Reconstructing p as final y minus perceived target y is an auditable deterministic derivation and may be reported as exploratory/post-hoc evidence; it cannot be described as the preregistered logged residual or used to cure the protocol failure. The analyst does disclose that derivation, so the derived values are not deceptive, but the causal attribution based on them must remain secondary.
+
+Apart from those decisive protocol defects, the numerical report checks out. R-084 and fresh v0 R-087 use the same 72 scene/seed pairs, commit c733d69, fingerprint 7f6eaa11, and all scenes are dev scenes with final_eval=false; no held-out scene appears. Independent metric recomputation exactly matches each run summary. On preregistered Arm B, R-084 is 12/16 and R-087 is 15/16, with four discordances favoring v0 and one favoring v46 (exact McNemar p=0.375); the effect is unresolved, as RS-020 correctly says. Direct recomputation over R-084’s 58 matched Arm B block observations gives median |e|=0.829 cm and max=4.8 cm, matching the reported 0.83/4.8 cm. The white-bridge values and caveats are disclosed, and the remaining idealizations are listed and scoped.
+
+The runner’s placement_error label for T2-dev-23 is substantively wrong, and RS-020’s correction to perception/target-localization error is justified: logged e is about 4.3–4.8 cm while the structure is shifted coherently, and the derived final-minus-perceived residual is under about 0.5 cm. This relabel is analysis, not an alteration of recomputed runner category counts.
+
+The 216-versus-144 episode overrun is a process violation. The duplicate R-085 batch cannot enlarge the confirmatory sample or be pooled as independent evidence. RS-020 appropriately uses R-084 alone for the primary threshold and labels R-085 a replicate; identical Arm B outcomes make the substantive tally robust, but do not erase A3. No independently recorded pre-run duplicate-selection rule was found in the reviewed records, so “first started is primary” should not itself be treated as verified preregistration. H-013, H-015, and the Arm B amendment do predate R-084, so the hypotheses and Arm B thresholds themselves are preregistered rather than post-hoc.
+  - surprise: 1) A NEW LATERAL PERCEPTION ERROR: the geometric measurement drops the structure's absolute y-offset. It re-centres the measured layout on y=0, so all blocks share one common-mode error equal to the true structure-centre offset (3.9-4.8 cm on T2-dev-20/23). This is the whole Arm B deficit vs v0 (4/4 failures). Gate 0 and the earlier dev scenes were probably centred near y=0, which would hide it. The white-mask fix worked on its pre-registered blocks. The PARTIAL template's premise 'perception fixed; target structure parse or x-shortfall' is contradicted again, because the successor should target absolute registration of the measurement (anchor to a world/table reference visible in the image).
+2) The failure classifier labels these episodes 'placement_error' although the telemetry shows |e| 3.9-4.8 cm and |p| < 0.5 cm (T2-dev-23), and fallback_blocks=0. The runner's failure categories under-count perception failures for v46.
+3) A replicated null on outcomes despite VLM nondeterminism: 10/16 Arm B response hashes differ between R-084 and R-085, yet 16/16 Arm B outcomes agree. The failures are deterministic geometry, not sampling noise. Across all 72 pairs, 6.9% of outcomes flip, entirely through structure-parse errors.
+4) render_rollout re-queries the VLM, so it does not replay the logged episode (the R-085 T2-dev-20 s0 re-render produced a different failure mode).
+5) v46 is numerically below v0 on the confirmatory arm (12 vs 15/16), although the difference is unresolved at n=16.
+- **RS-021** runs R-089: 1.00 [0.81, 1.00] (n=16); R-090: 1.00 [0.81, 1.00] (n=16)
+  - interpretation: X-046 STAGE-1 SCREEN under H-016's filed rule. Rule as filed: a candidate is eligible only if all 16 walks have XY <= 3 cm AND yaw < 10 deg. Tie-break: lower max XY; if |diff| < 0.1 cm, lower median XY; then A. If neither is eligible, H-016 is REFUTED at stage 1 and stage 2 is not run.
+Validity: R-089 and R-090 both ran at b42df27, fingerprint 4995f230 (identical), deterministic Sumo, max_workers=1, nominal start (-1.5,0,0) logged as actual_start_pose on all 32 eps, same 16 (scene, seed) pairs as R-080. A's logged gains match H-016: 160/160/0.2, CEM 24, 4.0 s, w_terminal_xy=400, frac=0.25, w_base_speed=10, gate 0.10 m. Re-rendering R-089 T0-dev-02 s1 reproduced the logged terminal qpos exactly (determinism OK for that ep). Block success: 16/16 for both, Wilson 95% [0.81, 1.00]. Not a discriminator.
+
+A = v2_walk_xy (R-089), walk end at t=4 s. Format per seed: XY cm / yaw deg / end speed cm/s.
+s0 1.41/+2.99/1.6 | s1 1.43/-11.14/4.3 | s2 2.02/+2.99/2.0 | s3 1.66/-6.31/5.5 | s4 0.64/-3.89/0.6 | s5 0.44/-1.61/3.6 | s6 0.54/-2.58/4.6 | s7 0.43/+2.52/2.2 | s8 1.07/+6.74/1.8 | s9 1.47/+3.33/4.0 | s10 1.55/+0.11/9.2 | s11 1.23/+6.42/7.2 | s12 0.56/-5.86/5.0 | s13 1.11/-2.05/0.9 | s14 1.39/+0.55/8.9 | s15 1.31/-6.33/2.5.
+Summary for A: max XY 2.02 (s2), median 1.27; 0/16 XY > 3 cm, 1/16 > 2 cm. |yaw| median 3.16, max 11.14 (s1). 1/16 yaw >= 10 deg (Clopper-Pearson 95% for the per-walk rate: 0.2-30%). End speed median 3.8 cm/s, 4/16 > 5 cm/s.
+=> A is INELIGIBLE on s1 yaw: 11.14 deg >= 10. Full-orientation error is 11.28 deg, so the yaw-only and full-orientation readings agree.
+
+B = v2_walk_settle (R-090), post-settle values at t=6 s, same format.
+s0 1.10/-7.34/6.9 | s1 0.81/+0.63/6.1 | s2 3.02/+6.24/1.1 | s3 0.86/+19.16/12.3 | s4 2.13/-8.83/1.8 | s5 2.39/-15.32/2.1 | s6 1.61/+4.97/6.3 | s7 1.51/-11.58/4.2 | s8 1.21/-16.27/4.2 | s9 1.02/-37.98/2.7 | s10 1.03/-1.15/1.9 | s11 0.73/+2.01/6.1 | s12 1.27/+2.74/1.5 | s13 0.51/-3.73/2.0 | s14 0.79/-0.25/11.1 | s15 1.26/+1.77/10.1.
+Summary for B: max XY 3.02 (s2), median 1.16. |yaw| median 5.6, max 37.98 (s9). 5/16 yaw >= 10 deg (s3, s5, s7, s8, s9; CP 95% 11-59%). Post-settle speed median 4.2 cm/s, 3/16 > 10 cm/s.
+=> B is INELIGIBLE on two counts: 5 yaw violations, plus s2 XY 3.02 cm > 3.
+
+SELECTION: none eligible. The tie-break is not reached. H-016 is REFUTED at stage 1, and stage 2 (84 eps) is not run.
+
+Paired comparison vs R-080 (v2_walk, same pairs). R-080 worst walk: s6 3.50 cm / 7.7-7.8 deg. R-080 summary: max XY 3.50, median 0.87; |yaw| median 2.6, max 7.7; 0/16 yaw >= 10.
+- A's worst XY walk, s2 2.02 cm / 3.0 deg, beats R-080's worst on XY by 1.48 cm. On R-080's own worst seed, s6, A reached 0.54 cm / 2.6 deg (vs 3.50 / 7.8). However, A's worst yaw walk, s1 11.14 deg, exceeds R-080's worst yaw by about 3.4 deg. On s1 itself, R-080 had 0.83 cm / -1.96 deg.
+- Paired XY change A - R080: median +0.34 cm; mean -0.08 cm, 95% t-CI [-0.64, +0.47]. 11/16 seeds worse (sign test p ~= 0.21). A cut the two-seed tail (s6 -2.96, s4 -1.75) but raised the typical miss (median 0.87 -> 1.27 cm). n=16 < 20, so the mean difference is NOT resolved.
+- B's worst XY walk, s2 3.02 cm (R-080 s2 walk end: 1.26 cm), is worse than R-080's s2. B's worst yaw walk, s9 -37.98 deg (R-080 s9 walk end: +3.85 deg), is about 5x R-080's worst yaw. The engineer reports B's walk phase is bit-identical to R-080, so every B-vs-R080 delta is caused by the 2 s settle phase. The settle phase fixed s6 XY (3.50 -> 1.61) but rotated 5 walks past 10 deg.
+
+H-016 predictions vs observed:
+- A: max XY <= 1.5 predicted, observed 2.02 (miss). Median <= 0.8 predicted, observed 1.27 (miss). Max yaw < 8 predicted, observed 11.14 (miss).
+- B: max XY <= 1.0 predicted, observed 3.02 (miss). Max yaw < 7 predicted, observed 37.98 (miss).
+- 'Expected pick: B' is wrong.
+
+Pre-registered diagnostic (does not decide): R-080 did not log end-of-walk speed, and B logs only post-settle speed, so 's6 speed > 5 cm/s at t=4 s' CANNOT be evaluated from the record.
+
+Idealizations still in use: oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, and fixed_nominal_walk_start. The last one was due to be removed in stage 2, which is now not run.
+  - failures: No episode failed on the block task (32/32 success). The screen fails on WALK-POSE gates only.
+(1) Yaw >= 10 deg. A: 1/16 (s1, -11.14 deg; XY was fine at 1.43 cm). B: 5/16 (s3 +19.2, s5 -15.3, s7 -11.6, s8 -16.3, s9 -38.0), all with XY <= 2.4 cm.
+(2) XY > 3 cm. A: 0/16. B: 1/16 (s2, 3.02 cm, borderline).
+(3) Unfinished motion at the measurement instant. A: 4/16 > 5 cm/s at t=4 s (max 9.2). B: 3/16 still > 10 cm/s AFTER the 2 s settle (s3 12.3, s14 11.1, s15 10.1). So the settle phase does not bring the base to rest.
+Visual: render of R-089 T0-dev-02 s1, inspected with codex on prompts/analyze_rollout/v1. Codex reports a gradual yaw drift that starts during the approach, not only in the last second, with heading still changing slightly at the end. The robot stays upright: no stumble, fall, or block/arm contact. The block is placed stably. Category: walk heading drift under the added terminal-XY cost; not a locomotion fault.
+Possible config deviation for B (flagged, does not change the verdict): H-016 specifies the settle phase as linear w_position=160 + w_heading=160 + w_xy_quad=2e4 + w_base_vel=50 with a 0.2 m/s cap. The logged settle_config is {w_position: 20000, squared_xy: true, w_heading: 160, w_base_speed: 50, cap 0.2}, so the linear 160 term may have been replaced rather than kept. The difference is negligible against 2e4*d^2. B's yaw failure matches the X-046 smoke disclosure (quad XY term overpowers w_heading=160). The engineer should confirm.
+  - review: reject by reviewer: REJECT. The numerical gate was applied correctly to the outputs that were produced: A/R-089 violates yaw<10 deg on seed 1 (|yaw|=11.14 deg); the recorded B/R-090 outputs violate yaw<10 deg on 5/16 seeds and XY<=3 cm on seed 2 (3.02 cm). H-016 (created 1791091906.75) and X-046 (created 1791094518.86) both predate R-089 (1791094856.46) and R-090 (1791095005.31), so the stage-1 rule is pre-registered. Both runs use the same 16 nominal T0 (scene,seed) pairs, the same b42df27 / 4995f230 code state, max_workers=1, and final_eval=false; no held-out scene appears. Recomputed pooled metrics are 32/32 success, Wilson 95% [0.8928,1.0], with each arm 16/16 [0.8064,1.0], matching the run/result records; success does not discriminate and RS-021 says so. The uncheckable R-080 end-speed diagnostic is correctly reported as unavailable and non-decisive. Idealizations, including the still-present fixed nominal walk start, are listed.
+
+The decisive defect is that B is not shown to be the frozen candidate filed in H-016. H-016 requires the settle objective to retain linear w_position=160 and add w_xy_quad=20000. R-090 instead logs w_position=20000 with squared_xy=true and no separate linear-160 term. That is a treatment/config deviation, not a harmless reporting difference established by the record. Calling it 'negligible' cannot waive the freeze; near 1 cm the omitted linear cost is comparable to the quadratic cost, and in any event equivalence was not demonstrated. Therefore B is untested-as-filed. Since the registered conclusion 'REFUTED at stage 1' requires neither A nor B to be eligible, A's valid failure plus an invalid/unknown B arm does not justify refuting H-016 or canceling stage 2 under that rule. B must be rerun with the filed objective (or the telemetry/config semantics must be proven to include both terms) before the neither-eligible conclusion is supported.
+
+R-080 uses exactly the relevant 16 T0 pairs but is on 1f465a4, not b42df27. A documented bit-for-bit reproduction at b42df27 is adequate for descriptive paired reference if auditable, and R-080 is not needed to determine A/B eligibility; however, the database contains no same-commit v2_walk run record, so R-080 should not be described as a formal same-commit control. This is secondary to the invalid B arm. The prior varied-start B smoke is disclosed and does not repair the nominal filed-arm test.
+  - surprise: 1) Candidate A brought back the very heading/position trade-off H-016 said was not the mechanism. Adding w_terminal_xy=400, with w_heading frozen at 160, cut the XY tail (R-080 s6 3.50 -> 0.54 cm, max 3.50 -> 2.02). It also produced a new yaw outlier on a seed that was clean under v2_walk (s1: -1.96 -> -11.14 deg) and raised the median XY (0.87 -> 1.27 cm). Late-horizon XY weight lets heading slip. 2) B's settle phase is destructive at the NOMINAL start, not only at the varied start seen in the smoke: 5/16 walks go past 10 deg, up to 38 deg from a 3.9 deg walk end, and the base is still moving at >10 cm/s after 2 s in 3/16. 3) Neither candidate met any of its own numeric predictions. A missed the yaw gate by 1.1 deg on one walk. Under the freeze this is a refutation; a successor (e.g., A plus a terminal heading term) must be filed as a new hypothesis, not as an edit.
+- **RS-022** runs R-091: 1.00 [0.93, 1.00] (n=48); R-092: 1.00 [0.93, 1.00] (n=48)
+  - interpretation: X-048, rung 2 (walking approach) on T1. v2_walk (R-091) vs a fresh matched v0 (R-092) on the same 48 (scene, seed) pairs: T1-dev-01..12 x seeds 100..147.
+
+PROVENANCE: VALID, not void. Both runs have commit b42df27 (git_head b42df274d0d5…), the same run_fingerprint 4995f23074e9…, the same workspace_sha256 c7ce5a148568…, and identical native-extension hashes (g1_extensions 5f95d3cf…, policy_rollout a579fb24…). The walk fingerprint was captured at 06:30:17 and the v0 one at 06:36:58. The commit matches the plan (b42df27). The pair lists are identical. compute_metrics recomputation matches both run summaries. Re-simulating s145 and s118 reproduced the logged terminal poses and block errors exactly (sumo_deterministic=true).
+
+SUCCESS (Wilson 95%):
+- v2_walk: 48/48 = 1.00, CI [0.926, 1.000].
+- v0: 48/48 = 1.00, CI [0.926, 1.000].
+- Paired success difference: 0/48 discordant pairs, so the difference is 0. The exact McNemar test is undefined (no discordant pairs). A 95% bound on |Δ| is about ±0.074 (Newcombe).
+
+RUNG-2 RULE (success >= 0.8 with CI, against a matched v0): CLEARS on T1. Even the Wilson lower bound (0.926) is above 0.8. This closes the D-011 gap (T1 had only 4/4). Rung 2 is now cleared on T0 (D-011, 16/16) and T1 (this result).
+
+PAIRED BLOCK ERROR (per-pair mean of the two blocks' pos_err, walk minus v0, n=48 pairs):
+- Median −0.099 cm (about −1.0 mm). 95% distribution-free CI for the median (order statistics 17 and 32 of 48): [−0.114, −0.083] cm.
+- 47/48 pairs are negative. The only positive pair is T1-dev-02 s137 (+0.016 cm). Sign test p ≈ 3e-13.
+- Pooled medians: walk 2.04 cm vs v0 2.13 cm. Angle error medians: 1.63° vs 1.70°.
+- Effect size: about 1 mm on a 30 mm tolerance. Statistically clear but practically negligible. Walking does not hurt placement under the current bridge, consistent with D-011 on T0 (−0.11 cm).
+
+WALK TERMINAL STATE (descriptive only, not a pass criterion; context for the known XY-drift risk; 48 distinct walks):
+- XY error from the nominal goal: median 1.02 cm, mean 1.15 cm, ~P90 2.4 cm, max 3.19 cm.
+- |yaw|: median 3.25°, max 12.15°. Signs are balanced (20 positive, 28 negative).
+- Terminal base speed: median 0.042 m/s, max 0.118 m/s. The base is still moving at handoff (settle_phase_s=0).
+- XY > 3 cm: 1/48 walks (T1-dev-10 s145, 3.19 cm, mostly +3.2 cm overshoot in x).
+- yaw >= 10°: 2/48 walks (T1-dev-01 s112, −11.88°; T1-dev-07 s118, +12.15°).
+- Union: 3/48 walks breach the XY/heading limits used in H-012/H-014. None of them failed, and none of their blocks was worse than the paired v0.
+- Compared with T0 (D-011: max XY 3.50 cm, max yaw 7.78°), XY drift recurs at about the same rate on T1, and a yaw tail above 10° appears that T0 did not show.
+
+IDEALIZATIONS STILL IN USE (v2_walk): oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, a fixed nominal start pose (−1.5, 0, 0.52) and goal pose for every walk, and implicitly perfect base-state knowledge: the arm plans from the true post-walk base pose, which is why XY/yaw error does not reach the blocks. The control v0 additionally uses fixed_base.
+
+PROCESS NOTE: the X-048 feasibility field required a short pre-registration from method_designer before any run. I could not find one in the record (query on "X-048" returns only X-048, X-050, R-091, R-092). The pass rule applied here is the ladder rule stated in D-011, which pre-dates these runs, and the outcome is far from the threshold, so the verdict does not depend on that. The reviewer should still confirm.
+  - failures: No failures in either arm (0/48 episodes, 0/96 blocks, failure_categories empty in both).
+
+Near misses by category:
+1. Placement margin (shared by both arms, not walk-caused): the largest block errors are walk 2.73 cm (T1-dev-07 s118 b1) and v0 2.79 cm (T1-dev-01 s136 b0), against a 3.0 cm tolerance. Errors are dominated by a systematic −x shortfall of about 1.5–2.2 cm (blocks land short of target x=0.85) in BOTH arms. So the placement margin is about 2–3 mm regardless of walking. That is a scripted-arm/weld bias, not a rung-2 issue.
+2. Walk XY overshoot: s145 ended 3.19 cm from the goal (+3.2 cm in x). Visual check (render_rollout contact sheet + codex analyze_rollout/v1): no visible anomaly in the walk, handoff or placement, and the stack is stable. Block errors were 1.64/2.26 cm vs v0 1.72/2.52 cm on the same pair.
+3. Walk yaw tail: s118 ended at +12.15° yaw. Visual check: the small body yaw is visible, with no knock-over, drop or collision, and the placement is "slightly offset but supported". Its b1 error of 2.73 cm equals the paired v0's 2.71 cm, so the margin loss is not caused by the yaw.
+
+Caveat on the visual check: codex's block-colour and stacking descriptions are inconsistent with the scene layout (it described b1 as "adjacent" on a base). Treat it only as "no gross anomaly visible". The logged poses are authoritative.
+
+Note: the walk-run videos stop after episode 12 (no video key for s112–s147). The two worst walks were re-rendered for this inspection.
+  - review: accept by reviewer: ACCEPT, with scope/process caveats. R-091 and R-092 are a valid matched treatment/control pair: identical 48 (T1-dev scene, seed) pairs, same git head b42df27, fingerprint 4995f230, workspace SHA, and native-extension hashes. No held-out scene was used; all are explicitly T1-dev and final_eval=false. Recomputed metrics agree with the run/result summaries: each arm is 48/48 with Wilson 95% CI [0.9259,1.0000] (pooled 96/96 [0.9615,1.0000]). Thus the prospectively frozen ladder target is met because the treatment lower bound exceeds 0.8. The matched success comparison shows no superiority or inferiority (0 discordant pairs); RS-022 correctly reports zero difference rather than claiming one. The paired block-error claim is reported as statistically nonzero but practically negligible, and is not credited to locomotion; its CI [-0.114,-0.083] cm excludes zero. Idealizations are explicitly listed, especially sumo_to_assembly_state_bridge and perfect true post-walk base-pose knowledge, and the interpretation confines the placement conclusion to the current bridge. Therefore 'rung 2 clears on T1' is justified only as the lab's idealized dev-tier success-rule decision, not as evidence that real handoff tolerates walk drift: 1/48 exceeds 3 cm XY, 2/48 reach >=10 deg yaw, and bridge/pose knowledge prevent that drift from propagating into placement. Pre-registration judgment: X-048 has no hypothesis_ids and RS-022 supports/refutes none, so this is not accepted as a new hypothesis test. It is an application of a decision rule fixed in D-011 before the runs and restated prospectively in X-048 (created before R-091/R-092), including design, seeds, comparison, and threshold. The absent separately authored method-designer note violates X-048's stated process requirement and must remain disclosed, but it does not make this threshold result post-hoc or change the rung-rule conclusion.
+  - surprise: 1) Walking slightly IMPROVES block placement in 47/48 pairs (about −1 mm, CI [−1.14, −0.83] mm). It reproduces on T0 (−1.1 mm, D-011). The likely mechanism is not the walk itself: the bridge sets the assembly base about 4–5 cm lower than v0's fixed base (assembly z ≈ 0.41–0.43). That changes arm kinematics and slightly reduces the shared −x shortfall. It is a property of the state bridge, so it should not be credited to locomotion. 2) The heading tail is worse on T1 than on T0: 2/48 walks ended at ≥10° yaw (max 12.15°) vs a max of 7.78° on T0, under the same w_heading=160. 3) The base is still moving at handoff (median 4.2 cm/s, max 11.8 cm/s). The bridge discards that velocity, so it is invisible to every success metric here.
+- **RS-023** runs R-093: 1.00 [0.81, 1.00] (n=16); R-095: 0.94 [0.72, 0.99] (n=16)
+  - interpretation: X-053 = H-016 STAGE-1 RE-SCREEN (rung 2), replacing RS-021, which the reviewer rejected because B was untested-as-filed.
+VALIDITY: R-093 (A, v2_walk_xy) and R-095 (B, v2_walk_settle) both ran at 319a838, fingerprint 548aeccd (identical; workspace_sha 933ec5c4). Both: deterministic Sumo, max_workers=1, final_eval=false, actual_start_pose (-1.5,0,0) on all 32 eps, the same 16 pairs T0-dev-((s mod 6)+1) x s0-15. H-016 (created 1791091906) and X-053 (1791097162) predate R-093 (1791097835) and R-095 (1791099069).
+A logged gains: 160/160/0.2, CEM 24, 4.0 s, w_terminal_xy=400, terminal_fraction=0.25, w_base_speed=10, radius 0.10 m. These match H-016.
+B logged phase_cost_weights. walk = {w_position 160, w_heading 160, w_controls 0.2, w_goal 60, w_xy_quad 0, w_terminal_xy 0, w_base_speed 0}. settle = {w_position 160 (LINEAR), w_xy_quad 20000, w_heading 160, w_base_speed 50, w_controls 0.2, w_goal 60}; settle_phase_s=2.0, base_speed_cap=0.2. All 16 eps have settle_phase_applied=true. => The settle phase as filed in H-016 (linear 160 PLUS quadratic 2e4) is CONFIRMED. B is tested-as-filed this time.
+Deviation flagged (does not change the verdict, see below): H-016 says B's walk is 'unchanged (v2_walk)'. B's walk runs through spot_walk_approach_xy with A's terms zeroed, inside a single 121-step MPC run. Its walk-end values do NOT reproduce R-080: s6 4.07 cm vs 3.50; s9 +3.82 deg vs +3.85. R-080 is also on another commit (1f465a4), and no same-commit v2_walk run exists. The engineer should check whether the 1 s CEM horizon sees settle costs during the last second of the walk.
+
+(1) PER-WALK TERMINAL VALUES. Format: XY cm / yaw deg / planar speed cm/s.
+A (walk end t=4 s = terminal): s0 1.41/+2.99/1.6 | s1 1.43/-11.14/4.3 | s2 2.02/+2.99/2.0 | s3 1.66/-6.31/5.5 | s4 0.64/-3.89/0.6 | s5 0.44/-1.61/3.6 | s6 0.54/-2.58/4.6 | s7 0.43/+2.52/2.2 | s8 1.07/+6.74/1.8 | s9 1.47/+3.33/4.0 | s10 1.55/+0.11/9.2 | s11 1.23/+6.42/7.2 | s12 0.56/-5.86/5.0 | s13 1.11/-2.05/0.9 | s14 1.39/+0.55/8.9 | s15 1.31/-6.33/2.5.
+A summary: max XY 2.02 (s2), median 1.27; |yaw| median 3.16, max 11.14 (s1); yaw>=7: 1/16; yaw>=10: 1/16 (Clopper-Pearson 95% 0.2-30%); 4/16 end speed > 5 cm/s.
+B walk end (t=4 s): s0 0.57/+2.62/5.1 | s1 1.00/-1.35/1.1 | s2 1.29/-3.28/2.9 | s3 0.91/-1.27/5.4 | s4 1.61/+0.21/9.8 | s5 0.34/-0.72/2.4 | s6 4.07/+7.48/3.9 | s7 0.80/-1.69/0.6 | s8 1.47/-6.93/6.0 | s9 0.55/+3.82/4.0 | s10 2.03/+4.59/5.0 | s11 0.32/-5.10/2.6 | s12 1.53/+3.19/6.7 | s13 0.46/-4.22/7.8 | s14 0.29/+5.67/9.4 | s15 1.00/+2.27/7.9.
+B walk-end summary: max XY 4.07 (s6), median 0.96; |yaw| max 7.48, median 3.24; 0/16 yaw >= 10.
+B post-settle (t=6 s = terminal pose handed to the arm): s0 2.10/-21.44/4.1 | s1 0.32/-8.89/7.7 | s2 2.05/-5.99/5.5 | s3 1.28/+36.35/2.1 | s4 1.04/-1.24/0.3 | s5 2.39/-15.32/2.1 | s6 1.36/+6.92/7.4 | s7 1.43/-7.03/13.9 | s8 1.26/-11.90/3.4 | s9 2.00/-36.67/5.6 | s10 0.69/+2.80/1.5 | s11 1.86/-10.61/5.8 | s12 0.68/+2.20/2.0 | s13 0.86/-10.73/1.6 | s14 0.69/+11.81/3.3 | s15 2.12/+3.26/7.9.
+B post-settle summary: max XY 2.39 (s5), median 1.32; |yaw| median 9.75, max 36.67; yaw>=7: 10/16; yaw>=10: 8/16 (s0, s3, s5, s8, s9, s11, s13, s14; CP 95% 25-75%); median speed 3.75 cm/s, s7 still at 13.9 cm/s.
+Settle-phase effect, paired post minus walk-end on the same episode: |yaw| rises in 13/16 (sign test p=0.021); median +5.4 deg; mean +8.7 deg, 95% t-CI [+2.7, +14.7] (heavy-tailed). XY: max 4.07 -> 2.39 cm, but mean change +0.24 cm, 95% CI [-0.42, +0.91], 10/16 worse, so the XY change is not resolved. The settle phase cuts the single XY outlier and spreads heading error.
+
+(2) STAGE-1 RULE AS FILED. Eligible only if all 16 walks have XY <= 3 cm AND yaw < 10 deg.
+A: INELIGIBLE. s1 yaw -11.14 (full orientation 11.28).
+B on the terminal pose H-016 intends (post-settle, the pose the arm uses; also the pose B's predictions refer to): INELIGIBLE, 8/16 yaw >= 10.
+B on the walk-end reading, as a sensitivity check: also INELIGIBLE, s6 XY 4.07 > 3.
+=> NONE ELIGIBLE under either reading. The tie-break (lower max XY -> lower median if |diff| < 0.1 -> A) is not reached. Per H-016, the hypothesis is REFUTED at stage 1 and stage 2 is not run. The walk-implementation deviation cannot rescue B. The yaw violations are created in the settle phase (walk-end max 7.48 deg). The same settle phase did the same thing in R-090, whose walk was reported bit-identical to R-080 (5/16 >= 10 deg). B fails on two different walk implementations.
+
+(3) REPRODUCTION OF A. R-093 matches R-089 (b42df27/4995f230). On s1, the full 26-dim final_qpos, terminal_base_pose, mean_reward (-55.53107771591226) and block final pose are identical to all printed digits. All 16 per-seed XY/yaw/speed values equal RS-021's R-089 table. Run-level median block pos err 2.144038338507876 and median ang err 1.6439289624169486 are identical in both runs. => A is bit-identical across the two commits. Full-qpos identity was checked on s1; the other 15 seeds match at logged precision plus identical run-level medians.
+
+BLOCK TASK (not a discriminator). A 16/16, Wilson 95% [0.81, 1.00]. B 15/16, [0.72, 0.99]. Pooled 31/32, [0.84, 0.99]. Median block pos err A 2.14, B 2.20 cm. n=16 per arm < 20, so the A-vs-B success difference is NOT resolved. Yaw-violation rate A 1/16 vs B 8/16: Fisher p~0.015, suggestive but not resolved by the n>=20 rule.
+
+H-016 PREDICTIONS vs OBSERVED:
+A: max XY <= 1.5 predicted, 2.02 observed (miss). Median <= 0.8 predicted, 1.27 observed (miss). Max yaw < 8 predicted, 11.14 observed (miss).
+B: max XY <= 1.0 predicted, 2.39 observed (miss). Median <= 0.5 predicted, 1.32 observed (miss). Max yaw < 7 predicted, 36.67 observed (miss).
+'Expected pick B': wrong.
+DIAGNOSTIC (non-deciding): R-080 has no t=4 s speed, so it still cannot be evaluated. B's near-v2_walk walk ends s6 at 4.07 cm while moving at only 3.9 cm/s (< 5), which is descriptively against the 'unfinished approach' mechanism.
+
+IDEALIZATIONS STILL IN USE: oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, fixed_nominal_walk_start. The last was due to be removed in stage 2, which is now cancelled.
+  - failures: Block-task failures: 1/32 (B, T0-dev-04 s9, placement_error 19.5 cm, pre-release error 19.3 cm, block angle error 11.7 deg). Walk-pose gate failures, by category:
+(a) Settle-induced yaw (B only): 8/16 >= 10 deg post-settle, starting from walk-end yaws <= 7.5 deg. The largest are s9 +3.8 -> -36.7 and s3 -1.3 -> +36.4, both rotating about 40 deg in 2 s while translating less than 2.5 cm. The quadratic XY plus speed terms dominate w_heading=160 near the goal. Restoring the linear 160 term did not help: R-090 had 5/16, R-095 has 8/16.
+(b) Walk heading drift under the terminal-XY term (A only): 1/16 (s1 -11.14 deg, XY 1.43 cm). This is the same seed and the same value as R-089, so it is deterministic and not noise.
+(c) XY > 3 cm: A 0/16. B post-settle 0/16. B walk-end 1/16 (s6 4.07 cm, moving at 3.9 cm/s).
+(d) Unfinished motion: A 4/16 > 5 cm/s at t=4 s. B 1/16 > 10 cm/s after the settle (s7 13.9), so the settle phase does not reliably bring the base to rest.
+VISUAL (B T0-dev-04 s9): render_rollout re-simulation reproduced the logged final_qpos exactly, so determinism is OK. Contact sheet runs/1791098460_v2_walk_settle/rollout_T0-dev-04_s9.png inspected with codex (prompts/analyze_rollout/v1). Codex: the walk is not the cause; the base rotates during the 2 s settle (t=4-6 s) to -36.7 deg with almost no translation. There is no early drop or post-release collapse; the block is already about 19 cm off before release. Codex's claim that the arm 'reached a target rotated with the base' is CONTRADICTED by the numbers: a base-frame target at -36.7 deg would land near (0.68, -0.53), but the block landed at (1.033, +0.067). That part of codex's answer is discarded.
+WALK OR ARM? Not the walk: s9 walk end is +3.8 deg / 0.55 cm. R-090 s9 reached -38 deg from the same kind of walk end; the shared mechanism is the SETTLE PHASE, not the walk. The arm is the proximate failure, but it is not a clean yaw threshold. The scripted arm placed successfully at -37.98 deg (R-090 s9, 16/16) and at +36.35 deg (R-095 s3, 2.4 cm), but missed by 19.5 cm at -36.67 deg (R-095 s9). The pre-release orientation shows about 19 deg roll, consistent with the scripted IK reaching the edge of its workspace or joint limits. Category: placement_error, secondary to settle-induced walk-pose yaw. Root cause: the settle phase. Proximate cause: a fragile scripted-arm envelope at about 37 deg base yaw.
+  - review: accept by reviewer: ACCEPT. H-016 (created 1791091906) and X-053 (created 1791097162) predate both evaluated runs R-093 (1791097835) and R-095 (1791099069), so the tested claims are pre-registered, not post-hoc. R-093 and R-095 share commit/fingerprint 319a838/548aeccd and exactly the same 16 T0 scene-seed pairs (seeds 0-15); the historical v2_walk reference R-080 also covers those T0 pairs, though on an older commit, and the decisive stage-1 rule is an absolute gate rather than a baseline-difference claim. No held-out stage-2 varied-start evaluation was run; both records are final_eval=false and use only the filed in-sample nominal stage-1 pairs. Recomputed metrics match RS-023 exactly: A 16/16, Wilson 95% [0.8064,1.0000]; B 15/16, [0.7167,0.9889]; pooled 31/32, [0.8426,0.9945]. RS-023 correctly treats the A-vs-B block-success difference as unresolved because the CIs overlap and n=16/arm. The refutation does not rely on that difference: the pre-registered eligibility rule requires every episode to have XY<=3 cm and yaw<10 deg. A fails at s1 yaw -11.14 deg. B was tested as filed with settle linear w_position=160 plus w_xy_quad=20000 and fails on the terminal post-settle pose delivered to the arm (8/16 yaw>=10 deg, max 36.67 deg). Reading B at post-settle is the natural interpretation because B is defined as a walk followed by a settle phase and its filed predictions concern the resulting candidate pose; in any event the ambiguity is non-decisive because B also fails at walk end (s6 XY 4.07 cm). Therefore neither arm is eligible, H-016 is refuted under its own filed stage-1 rule, and cancelling stage 2 is justified. The phase-hook/standalone one-step timing explanation resolves the R-080 walk-end discrepancy as a snapshot-boundary difference if the engineer's no-op reproduction is accepted; crucially, no cost-leakage assumption is needed for the verdict. RS-023 lists the remaining idealizations (oracle structure/order, weld grasp, scripted arm, no arm-block collision, Sumo-to-assembly bridge, and fixed nominal walk start) and does not generalize beyond the nominal in-sample screen.
+  - surprise: 1) The settle phase AS FILED (linear 160 restored on top of quadratic 2e4) does WORSE on heading than the mis-implemented R-090: 8/16 vs 5/16 yaw >= 10 deg. The missing linear term was not what drove B's failure, so the reviewer's concern was procedurally right but did not change the outcome. 2) Block success hides walk-pose quality. At about 37 deg base yaw, the scripted arm succeeded twice (R-090 s9 -38, R-095 s3 +36) and failed once (R-095 s9 -36.7, 19.5 cm miss). The arm envelope near this yaw is knife-edge, so 'block placed' is not evidence that the pose was acceptable. 3) B's walk phase at 319a838 does NOT reproduce R-080 (s6 4.07 vs 3.50 cm), even though H-016 says it is unchanged v2_walk. The likely cause is the 6 s single-MPC implementation letting settle costs leak into the walk horizon; this is unconfirmed. 4) A is bit-identical across b42df27 -> 319a838, so the A arm and its s1 yaw failure are fully reproducible. 5) Every numeric prediction for both candidates missed. Next step: a successor hypothesis (for example, A plus a terminal heading term, or a settle phase with heading weight scaled to the quadratic XY term) must be filed fresh under the freeze. It is not an edit to H-016.
+- **RS-024** runs R-094: 0.97 [0.87, 1.00] (n=40); R-096: 0.94 [0.72, 0.99] (n=16)
+  - interpretation: X-051 / H-019 rung 5, v47_vlm_anchor. Primary batches: R-094 (v47, 40 episodes) and R-096 (fresh v0, 16 episodes), frozen commit 319a838.
+
+VOID CHECKS (R2 + A1/P2/Q1), applied first:
+- V1 PASS. Both runs have run_fingerprint.id 548aeccd…dac725, git_head 319a838eea76…, workspace_sha256 933ec5c4…8b70. These match in the run records and in every episode.
+- V2 PASS. All 40 v47 episodes (16 confirmatory + 24 T1) log cached=false, cache_mode=fresh_per_seed and response_sha256. Every matched block has code-logged e and p. n_missing = 0 and n_spurious = 0 in all 40.
+- V3(b) PASS and V3(c) PASS. All 32 confirmatory episodes (16 per arm) log scene_files_sha256 for all 7 files of their id. Every logged hash equals E-011, which is the h1 reference and equals the h2 freeze hashes per E-013.
+- V3(a) NOT EVALUATED. The on-disk h4 rehash could not be run because the analyst shell is denied. The engineer must do h4. If any of the 56 files differs from E-011, that batch is VOID, and with R4 there is then no verdict.
+- cached=false holds in every v47 episode.
+The verdict below is CONDITIONAL on h4 matching.
+
+THRESHOLDS, in order:
+- (2) REFUTED: not triggered. v47 confirmatory = 15/16 = 93.8%, Wilson 95% CI [71.7%, 98.9%]. T1 = 24/24 = 100%, CI [86.2%, 100%].
+- (3) MECHANISM REFUTED: not triggered.
+  - Matched-block |e| over the 60 confirmatory block-episodes (30 unique values, because e is identical across seeds): median 0.09 cm, max 0.28 cm (T3-dev-42 cyan pier).
+  - Largest |per-scene mean e| on the 7 large-offset scenes: 0.11 cm.
+- (4) PARTIAL: not triggered.
+- (5) SUPPORTED: every condition met. 15 ≥ 14; 24 ≥ 23; the failing episode's matched blocks have |e| ≤ 0.28 cm, under 1.5; every large-offset scene has |mean e| ≤ 0.11 cm, under 1.0.
+=> H-019: SUPPORTED, conditional on h4.
+
+Mechanism predictions met:
+- Median |e| 0.09 against the predicted ≤ 0.6; max 0.28 against ≤ 1.5.
+- n_missing + n_spurious = 0 against ≤ 2.
+- Counterfactual teeth shown on all 7 large-offset scenes. Per scene, mean e anchored vs mean e_recentred (cm), with c0:
+  - T2-dev-24 (c0 +7.45): -0.04 vs -7.48
+  - T2-dev-25 (c0 -5.4): +0.08 vs +5.38
+  - T2-dev-28 (c0 -9.5): +0.08 vs +9.46
+  - T3-dev-40 (c0 -4.4): +0.05 vs +4.35
+  - T3-dev-42 (c0 +10.6): -0.10 vs -10.49
+  - T3-dev-43 (c0 -9.25): +0.11 vs +9.28
+  - T3-dev-44 (c0 -7.55): +0.05 vs +7.48
+  - T2-dev-26 (centred, c0 -0.5): +0.03 vs +0.50
+  The recentred counterfactual reproduces e = -c0 to within 0.1 cm on every scene. That confirms the RS-020 defect, and shows v47 removes it.
+
+ERROR SPLIT BY OFFSET SIGN (S4):
+- c0 > 0 (T2-dev-24, T3-dev-42; 7 blocks): mean e = -0.07 cm.
+- c0 < 0 (5 scenes; 20 blocks): mean e = +0.08 cm.
+- No sign or mirror error; a mirror error would show as about 2·|c0|. There is a small residual proportional to y (see SURPRISE).
+
+LOW-MARGIN SCENES:
+- T3-dev-40: teeth SHOWN, |mean e_recentred| 4.35 ≥ 3.5 (margin 0.85). Anchored mean e +0.05. 2/2 pass. s0 red pier p = -1.60 cm (pos_err 2.1 cm, still inside the 3 cm tolerance).
+- T3-dev-44: the weak off-grid blocks are measured without snapping (brick e +0.07, support e -0.09). 2/2 pass.
+- T2-dev-24: the single off-grid block (true +1.2) is perceived at +1.29, not snapped to 0. 2/2 pass. That block has the largest T2 placement residual (p -1.40 / -1.55 cm; pos_err 1.5-1.6 cm, inside tolerance).
+
+PLACEMENT RESIDUAL p:
+- 3 of 60 confirmatory block-episodes have |p| > 1.5 cm: T3-dev-42 s0 orange -1.70, T3-dev-40 s0 red -1.60, T2-dev-24 s1 red -1.55. All three are layer-0 piers in SUCCESSFUL episodes.
+- In the one failure, the failing block has p = +0.11 cm.
+
+COMPARISON vs fresh v0 (same 16 scene/seed pairs):
+- v0 15/16 (93.8%, CI [71.7%, 98.9%]).
+- Effect size v47 - v0 = 0.0 pp; paired 95% CI roughly -19 to +19 pp.
+- Exact McNemar p = 1.0: 0 discordant pairs, and both arms fail only T3-dev-42 s1.
+- Scene-level tally (both seeds pass): 7/8 vs 7/8.
+- With n = 16 per arm (< 20), the v47-vs-v0 difference is NOT resolved. The H-019 verdict is absolute, so this does not affect it.
+- Descriptive: v47 median final position error 0.26 cm vs v0 1.92 cm. This reflects the closed-loop placement, not perception.
+
+SCOPE: confirmatory n = 16 episodes on 8 scenes. Perception has an effective n of 8 scenes / 30 unique blocks, because e is deterministic from pixels. 15/16 is consistent with any true rate from about 72% to 99%.
+
+IDEALIZATIONS STILL IN USE (v47): oracle_build_order, oracle_block_pose (the closed-loop correction reads sim truth), fixed_base, weld_grasp, no_arm_block_collision, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera; scripted_arm is implicit. v0 additionally uses oracle_structure_spec.
+  - failures: One failure per arm, the SAME pair: T3-dev-42 seed 1, a bridge_cap (orange and cyan cube piers, white brick span, green cube cap). The runner labelled it placement_error in both arms.
+
+By category:
+- Perception (missing / spurious / measurement): 0 episodes. n_missing = 0 and n_spurious = 0 in all 40 v47 episodes. In the failed episode all matched |e| ≤ 0.28 cm: orange +0.10, cyan -0.28, white span -0.13, green cap -0.09.
+- Lateral placement (|e| ≤ 1.5 and |p| > 1.5): 0 episodes. The failed episode's p values are +0.69, -1.00, -0.15 and +0.11 cm (cap).
+- ORIENTATION / yaw at release (a category H-019's split does not have): 1 episode per arm.
+  - The green cap b3 is in position: pos_err 0.14 cm in v47, 1.39 cm in v0.
+  - Its final yaw is 11.87° (v47) and 11.79° (v0), over the 10° angular tolerance. The cap's quaternion z is about 0.103 in both arms.
+  - The yaw is ALREADY present in the pre-release pose in both arms (quaternion z 0.1029 / 0.1026, about 11.8°). So it is carried in from grasp or carry, not caused by the release.
+  - Seed 0 of the same scene has cap yaw of about 3°.
+  - Visual check: render_rollout plus codex on prompts/analyze_rollout/v1.md, on both contact sheets. v47: 'carried to the correct, centered target location, but at release it is left with a slight yaw … placement/grasp orientation error at release, not a perception or wrong-target error.' v0: 'placement yaw present at release, not a grasp failure … no collision or collapse.'
+
+Answer to the PI's question: NOT perception. v0 has the oracle structure spec and fails identically, and v47's lateral errors are tiny. It is also NOT a lateral scripted-arm placement bias, because the cap is centred to 0.1-1.4 cm. It is a seed-1-specific yaw error of about 11.8°, carried by the shared scripted-arm / weld-grasp path, which both arms run identically. v47's closed-loop correction corrects position only, never yaw. The white span itself is fine: e -0.13 cm, ang_err 0.5°. So the 'white bridge' feature is not implicated. The likely origin (a seed-dependent start yaw that weld_grasp preserves) is a hypothesis; the analyst has not verified it against the start state.
+
+Classifier note: the episode is labelled placement_error although |p| ≤ 1.5 for every block. The label is descriptive only (H-019 item 3), but an 'orientation_error' class is needed.
+  - review: accept by reviewer: Accepted only together with addendum RS-025 and human evidence E-015. H-019 and every outcome-relevant dated amendment/closed-set note predate the first v47 run; X-051 used the pre-registered 8 dev scenes and seeds 0-1, with fresh v0 on exactly the same 16 pairs. Recomputed R-094 and R-096 metrics exactly match the result: v47 confirmatory 15/16, T1 24/24, v0 15/16, Wilson CI for each confirmatory arm [0.7167,0.9889]. Threshold 5 is an absolute pre-registered count/mechanism rule, not a superiority rule, so equality to v0 does not defeat support; the treatment-control difference is correctly labeled unresolved (0 discordant pairs, overlapping CIs). The mechanism criteria reported are within the filed limits, the shared T3-dev-42 s1 yaw failure is not claimed as a treatment gain, and known_target_camera plus the other idealizations are disclosed. No held-out scene was used. E-015 corrects E-013: the scene files were untracked and were not part of git commit 319a838, so 'at frozen commit'/'clean tree' wording must not be relied on. Nonetheless, E-011 predates v47 code, all 32 confirmatory episodes logged all seven file hashes matching E-011, and independent post-run h4 recomputation matched all 56, establishing byte continuity for the actual scene files used and satisfying the filed V3 checks. RS-024's conditionality is closed only by RS-025/E-015.
+  - surprise: 1) The only failure in both arms is an ORIENTATION failure: a cap yaw of about 11.8°, identical to 0.1° across v47 and v0, already present before release. Neither perception nor lateral placement. H-019's e/p split cannot categorize it, and the classifier calls it placement_error. Yaw is outside the closed-loop correction, and the angular tolerance (10°) is the binding constraint here.
+
+2) 'fresh_per_seed, cached=false' does not give independent perception samples.
+- The perception geometry (e, y_anchored) is byte-identical across seeds in all 8 confirmatory scenes, because it is deterministic from pixels.
+- The codex response_sha256 is identical across seeds in T2-dev-24, T2-dev-26 and most T1 scenes.
+- T1-dev-01 and T1-dev-07 even share a response hash; their target PNGs are byte-identical, and T1-dev-07..12 reuse the pictures of T1-dev-01..06 with different JSONs.
+- So the T1 non-regression set has only 6 distinct target images, and the seed axis mostly varies the arm.
+
+3) There is a small residual proportional to y: e ≈ -0.012·y_true, a scale underestimate of about 1.2%. For example: T3-dev-43 purple, y -21.75, e +0.27; T3-dev-42 cyan, y +19.3, e -0.28. It is sign-symmetric, so it is not a mirror error, but it would reach about 0.5 cm at |y| ≈ 40 cm. Candidate causes: the d/f constant or half-pixel quantization of u.
+
+4) The 3 largest placement residuals (|p| 1.55-1.70 cm) are all layer-0 piers at |y| ≤ 4 cm in successful episodes. The closed-loop placement has about 1.5 cm of unused margin there.
+- **RS-025** runs R-094: 0.97 [0.87, 1.00] (n=40); R-096: 0.94 [0.72, 0.99] (n=16)
+  - interpretation: ADDENDUM to RS-024 (X-051 / H-019). It closes the one void check left open there. It is filed as a new record because results cannot be edited; RS-024's analysis stands unchanged except that its verdict is no longer conditional.
+
+VOID CHECKS, now complete, citing E-014 (the engineer's read-only h4 audit at clean lab-v1 319a838):
+- V1 PASS. Both runs are at git_head 319a838, fingerprint 548aeccd…dac725 and workspace_sha256 933ec5c4…198b70. Confirmed by E-014 and by the run records.
+- V2 PASS, per RS-024. All 40 v47 episodes have cached=false, a response hash, and e and p for every matched block.
+- V3(a) PASS. All 56 confirmatory scene files on disk match E-011, which equals h2 per E-013 (E-014).
+- V3(b) and V3(c) PASS. All 32 confirmatory episodes logged all 7 hashes, with 0 missing and 0 mismatches. This is E-014, and it agrees with the analyst's comparison in RS-024.
+- cached=false holds.
+=> Neither primary batch is void.
+
+VERDICT, unchanged from RS-024 and now unconditional: H-019 is SUPPORTED under threshold 5.
+- v47 confirmatory 15/16 (93.8%, Wilson 95% CI 71.7-98.9%); T1 24/24 (CI 86.2-100%).
+- Matched-block median |e| 0.09 cm, max 0.28 cm.
+- All 7 large-offset scenes have |mean e| ≤ 0.11 cm, against a recentred counterfactual of 4.35-10.49 cm.
+- Failing-episode matched |e| ≤ 0.28 cm.
+- v47 - v0 = 0 pp (paired 95% CI about ±19 pp; exact McNemar p = 1.0). With n = 16 per arm this difference is NOT resolved, and it is not part of the verdict.
+
+Idealizations still in use (v47): oracle_build_order, oracle_block_pose, fixed_base, weld_grasp, no_arm_block_collision, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera, plus implicit scripted_arm. v0 also uses oracle_structure_spec.
+  - failures: Unchanged from RS-024. Both arms have one failure, on the same pair, T3-dev-42 s1: the green cap ends with about 11.8° of yaw (v47 11.87°, v0 11.79°), and the yaw is already present before release. It is in position (pos_err 0.14 / 1.39 cm), with no perception error (|e| ≤ 0.28 cm) and no lateral placement residual (p = +0.11 cm). Category: orientation from the shared grasp/carry path, which the runner mislabels as placement_error. Zero perception failures and zero lateral placement failures.
+  - review: accept by reviewer: Accepted as the addendum that closes RS-024, subject to E-015's correction of provenance wording. Recomputed run metrics match exactly: R-094 is 39/40 overall with confirmatory 15/16 and T1 24/24; R-096 is 15/16; confirmatory Wilson 95% CI is [0.7167,0.9889] in both arms. H-019's filed threshold 5 requires v47 >=14/16, T1 >=23/24, failing-episode matched |e| <=1.5 cm, and each large-offset scene |mean e| <=1.0 cm; the reported 15/16, 24/24, max failing-episode |e| 0.28 cm, and maximum large-offset |mean e| 0.11 cm satisfy it. The matched-control requirement is met by identical scene/seed pairs and fingerprint. Superiority is not required and is not supported: v47=v0, zero discordant pairs, and the difference is correctly reported unresolved. H-019 and all operative notes predate R-094; no held-out scenes were used; known_target_camera and remaining idealizations are disclosed. Scene files were untracked, so claims that they were contained in or hashed 'at commit 319a838' are inaccurate and superseded by E-015. The defensible integrity chain is instead E-011's pre-code 56-file baseline, 32/32 episode logs with seven matching hashes each, and independent post-run disk rehash 56/56 matching. That establishes unchanged bytes actually used and passes the pre-registered V3 checks despite the git-provenance wording error.
+  - surprise: Nothing new beyond RS-024. The h4 audit found no discrepancy.
+- **RS-026** runs R-097: 0.99 [0.94, 1.00] (n=96)
+  - interpretation: Diagnostic of the single R-097 failure (T1-dev-07 s526); this is not an effect estimate. R-097 overall: 95/96 = 0.990 [0.943, 0.998]; T1-dev-07: 3/4 seeds succeed (n=4, too few to estimate a per-scene rate). Root cause: perception, not the planner. v47 (fresh_per_seed VLM call) returned 3 blocks for a 2-block scene: a hallucinated blue brick (layer 0, lateral fallback to rough_y), a green cube on it at y=-3.68 cm (matches the truth, -3.677 cm), and a cyan cube on it at y=0. The true spec is a cyan BRICK at layer 0 with a green cube on it. So the VLM split the cyan brick into a phantom 'blue brick' plus a 'cyan cube'. The support graph is acyclic and fully supported (support_valid_perceived=true). So the exception is support_sort's stability branch, 'order_infeasible: prefix [...] not stable', on the third prefix (blue brick, green cube, cyan cube). The two layer-1 cubes are 3.7 cm apart center-to-center, so they interpenetrate and the settle fails. Inferred: the handler keeps only the text before ':', so the message is not logged verbatim. The planner correctly rejected a physically impossible spec. Seed 527 (same image, fresh VLM call) parsed 2 blocks correctly and succeeded with pos_err 0.25/0.97 cm. The failure is VLM-stochastic, not deterministic in the scene.
+  - failures: perception_hallucinated_block / type error (1): the cyan brick was perceived as a blue brick plus a cyan cube. order_infeasible is downstream: support_sort's unstable prefix comes from the overlapping cubes. 'order' attribution (h020 classify_failure) is a misattribution: the root category is perception. The robot never moves: final block poses equal the start poses, no placement stages appear in the log, and the GIF/contact sheet confirm the robot stays stationary.
+  - review: pending by -: 
+  - surprise: (a) prompt_sha256 differs between s526 (e0311562…) and s527 (decff47b…) within the same run and image. Either the prompt carries per-seed content or it changed mid-run; this must be pinned before the H-020 freeze. (b) s526 used ppm 629 with bottom_reference_px=null and fallback_blocks=1, while s527 used ppm 420 with a bottom reference. (c) Telemetry marks the correctly perceived green cube as 'missing', because spec is emptied before _match. The error rows mean 'planner rejected', not 'perception missed'. (d) The codex rollout reader reported 3 blocks on the floor; the physical scene has 2, so this is likely a prompt echo. Do not trust its block count.
+- **RS-027** runs R-098: 1.00 [0.96, 1.00] (n=96); R-099: 1.00 [0.96, 1.00] (n=96)
+  - interpretation: X-058 (H-020 confirmatory). R-098 v6_combo (rungs 1+2+5) vs R-099 fresh v0, on identical scene/seed pairs at commit 76cc1a7. Both runs share fingerprint 0b4bba36 and workspace 432aef91.
+
+H-020 VERDICT IS PENDING the engineer's V1–V4 audit. Status is deliberately not set.
+
+SUCCESS
+- v6_combo: T0 48/48, Wilson 95% [0.926, 1.000]. T1 48/48, [0.926, 1.000]. Pooled 96/96, [0.962, 1.000].
+- v0: identical, 48/48 and 48/48.
+- Paired McNemar: 0 discordant pairs, so it is undefined (p = 1).
+- Both arms are at ceiling, so no composition penalty can be detected at this n. Each tier's lower bound of 0.926 only excludes true rates below about 93%. A per-tier penalty of up to about 7 percentage points cannot be ruled out.
+- Pass-rule pre-check: ≥44/48 per tier is met in both tiers. Threshold 2 (order) does not fire: support_valid_true is true 96/96 and planner_error is null 96/96. If V1–V4 are clean, threshold 5 gives SUPPORTED.
+
+PER-STAGE TELEMETRY (v6_combo)
+- Perception:
+  - structure_matches_true 96/96, with 0 missing and 0 spurious blocks. Types and layers match everywhere.
+  - Every episode has cached=false and a single perception_prompt_sha256 (d630c678…).
+  - Perception error e over 144 matched blocks: median |e_xy| 0.00 cm, max 0.072 cm. Yaw and z errors are 0.
+  - Caveat: e is identically 0 on every layer-0 block, because the anchor defines the base at (0, 0). So e tests nothing on T0. On T1 tops it depends only on the scene, ranging 0.003–0.072 cm.
+- Walk end:
+  - XY error: median about 1.0 cm, max 3.29 cm. 1/96 is over 3 cm (T1-dev-08 s1531).
+  - |yaw|: median about 2.7°, max 12.96° (T1-dev-02 s1506). 3/96 are ≥10° (s1425 −10.6°, s1506 −13.0°, s1547 −10.2°). s1446 is at −9.996°, just under.
+  - Both counts are within the mechanism prediction of ≤3/96.
+  - walk_drift_absorbed = 4 episodes (1425, 1506, 1531, 1547), all passing.
+- Placement residual |p_xy| over 144 blocks:
+  - Median 0.25 cm (run median pos_err 0.248 cm). T0 median about 0.57 cm, T1 median about 0.21 cm.
+  - 3 blocks are over 1.5 cm, all in T0-dev-06: s1441 1.88, s1443 1.82, s1444 2.80 cm.
+- Paired block error, v6_combo − v0, using the per-episode mean pos_err with an order-statistic 95% CI:
+  - T0: median −1.74 cm, 95% CI [−1.88, −1.53]. v6_combo is better on 47/48 pairs. The exception is T0-dev-06 s1444, at +0.06 cm.
+  - T1: median −1.84 cm, 95% CI [−1.87, −1.81]. v6_combo is better on 48/48 pairs.
+  - v0's roughly 2 cm residual is a systematic bias in the scripted arm (it lands about 1.7–2 cm short in x). The closed-loop weld correction removes it.
+  - This gain in precision is real, but it does not show up in success because v0 also passes the 3 cm tolerance.
+
+DISCLOSURES
+- The prompt nonce was removed at 76cc1a7. v47 cleared X-051 with a per-call nonce, so the confirmatory runs used a different prompt regime from the one that passed X-051. Every episode is cached=false and VLM response hashes vary across seeds, yet the parsed layouts were identical.
+- R-097 was exploratory and was seen before this confirmatory run. Its failure was T1-dev-07 s526. T1-dev-07 parsed correctly in all 4 confirmatory episodes.
+- Idealizations still in use (v6_combo):
+  - weld_grasp, scripted_arm, no_arm_block_collision
+  - oracle_block_pose: the closed-loop correction reads the sim's ground-truth block pose
+  - sumo_to_assembly_state_bridge: XY is reset to nominal and yaw is carried through
+  - fixed_nominal_walk_start, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera
+  - fixed_base is dropped.
+- v0 still uses oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm and no_arm_block_collision.
+  - failures: No failures in either arm (0/96 each), so there are no failure categories. Near-misses are attributed by stage below.
+
+PLACEMENT (closest to failing): T0-dev-06 s1444
+- pos_err is 2.80 cm against a 3.0 cm tolerance, a 0.2 cm margin. p = (−1.99, −1.96) cm, yaw −5.1°.
+- The walk was clean (yaw −1.0°, XY 1.33 cm), so this is not walk drift.
+- The closed-loop correction did not converge. Pre-release error was 2.52 cm, and after two passes the remaining error was 2.67 cm, even though IK residual was about 1e-6. The commanded offsets of about (1.8, 1.7) cm did not move the brick.
+- The same scene is also the worst in the rest of the run (s1441 1.88, s1443 1.82 cm) and is v0's worst T0 scene (2.61–2.74 cm). This points to something about the scene or the brick geometry, such as the yellow brick's weld offset, rather than to perception: e = 0.
+- Codex (analyze_rollout v1, contact sheet rollout_T0-dev-06_s1444.png) reported failure_visible=true, phase=after_release: "final pose visibly slightly offset and rotated relative to the target footprint; no drop, knock-over, collapse or arm collision." So the offset is large enough to see, but it passes the criterion.
+
+WALK (worst yaw): T1-dev-02 s1506
+- Walk-end yaw was −12.96° and XY 1.50 cm. Attributed as walk_drift_absorbed.
+- Base block 0.87 cm (correction converged to 1.12 cm remaining), top block 0.25 cm.
+- Codex reported failure_visible=false: "structure upright and aligned."
+- The bridge resets XY but carries yaw through. T0-dev-04 shows larger p_x (−1.1 to −1.3 cm) together with walk yaw of −6° to −11° (s1425, 1430, 1431). This suggests yaw leaks into placement, though it is only partial; T0-dev-06 is large regardless of yaw.
+
+PERCEPTION and ORDER: no near-misses. Structure matched 96/96, maximum e was 0.072 cm, and support was valid 96/96.
+  - review: pending by -: 
+  - surprise: 1. The closed-loop placement can fail to converge without any sign in the IK. In T0-dev-06 s1444, remaining error grew from 2.51 to 2.67 cm over two passes while IK residual stayed near 1e-6. That episode came within 0.2 cm of failing for a reason unrelated to perception or walking. At larger n this is the most likely route to a v6_combo failure.
+2. The perception metric e is identically 0 on every layer-0 block, by construction of the anchor. "Perception e" therefore says nothing about T0; only T1 tops carry signal.
+3. Seven dev scene pairs share byte-identical renders but have different JSON: T0-dev-03/04, and T1-dev-01/07, 02/08, 03/09, 04/10, 05/11, 06/12. The effective number of distinct T1 images is 6, not 12. This weakens the independence behind the per-tier n and should go to the engineer.
+4. Yaw from walk drift leaks through the bridge into placement residual (T0-dev-04). A bridge that also reset yaw would hide this.
+5. The two codex calls returned different prompt_sha256 values for the same prompt_path. The hash probably includes the attached text, but please confirm before relying on prompt hashes for V4-style checks on analysis calls.
+- **RS-028** runs R-098: 1.00 [0.96, 1.00] (n=96); R-099: 1.00 [0.96, 1.00] (n=96)
+  - interpretation: FINAL verdict for X-058, which supersedes the "pending" status in RS-027. All telemetry, CIs and disclosures from RS-027 still stand.
+
+The engineer's audit (E-018) PASSES V1–V4:
+- the git head, fingerprint and workspace are the same for both runs;
+- v6_combo telemetry is complete (n/a_mismatch counted as present, 0 occurrences);
+- all 1,344 scene hashes match the committed bytes;
+- there is a single prompt_sha256 and no cached responses;
+- the pairs are identical and pre-registered.
+
+So X-058 is a valid confirmatory test. Applying H-020 as filed:
+- v6_combo is 48/48 in T0 and 48/48 in T1, which meets the ≥44/48-per-tier rule. Wilson 95% is [0.926, 1.000] per tier, and pooled 96/96 is [0.962, 1.000].
+- Threshold 2 (order) does not fire: support_valid_true is true 96/96 and planner_error is null in all episodes.
+- So threshold 5 applies: SUPPORTED.
+
+Scope of the claim: composing rungs 1, 2 and 5 keeps success at or above 44/48 per tier on these dev scenes, under the idealizations listed in RS-027. The comparison with v0 does not establish that composition carries no penalty: both arms are 100%, there are 0 discordant pairs, and a penalty of up to about 7 percentage points per tier cannot be ruled out.
+
+The secondary result is precise and does show an effect. Paired block error, v6_combo − v0, is −1.74 cm (95% CI [−1.88, −1.53]) on T0 and −1.84 cm ([−1.87, −1.81]) on T1.
+
+The effective n is weaker than 48 per tier because seven scene pairs share identical renders (RS-027 surprise #3).
+  - failures: 0/96 failures in either arm. There are no failure categories.
+
+The near-misses are the same as in RS-027:
+- T0-dev-06 s1444: 2.80 cm against the 3.0 cm tolerance. The closed-loop placement correction did not converge. This is the stage most at risk.
+- T1-dev-02 s1506: −12.96° walk yaw, absorbed by the controller (walk_drift_absorbed).
+
+walk_drift_absorbed occurred in 4/96, as the audit confirms.
+  - review: accept by reviewer: ACCEPT. R-098 and R-099 are valid matched primary arms for X-058: both contain the identical 96 pre-registered (scene, seed) pairs, share git head 76cc1a7, workspace/fingerprint 0b4bba36…, and use only T0/T1 development scenes (final_eval=false); E-017 establishes that seeds 1400–1547 were unused before the freeze, and R-097 is neither pooled nor counted. Recomputed metrics agree with the records: each arm is 96/96 overall and 48/48 in each tier; the per-tier Wilson 95% CI is [0.9259,1.0000], so v6_combo exceeds H-020's filed >=44/48 and lower-bound >=0.8 threshold. E-018 closes V1–V4: complete telemetry, 1,344/1,344 scene hashes matching the committed bytes, one prompt hash with cached=false throughout, and matched structure/support_valid_true in 96/96 with no planner error. H-020 was created before any v6_combo run, and every rule used for X-058—including the post-R-097 empty-plan supersession, C1/C2, n/a_mismatch handling, prompt pinning, V4, fresh seed block, and X-058 design—was recorded before R-098's capture. Those changes were informed by exploratory R-097 and therefore are post-exploratory method development, but not post-hoc to X-058; importantly, the revised order/perception rule did not affect this verdict because all 96 confirmatory structures matched and all plans were valid. Removing the per-call nonce changes the prompt regime from v47's X-051 run and could reduce draw-level variation, but it was frozen before X-058, calls remained uncached, response hashes varied, and the deviation is disclosed; the support claim therefore applies to v6_combo as frozen at 76cc1a7, not to an unchanged reproduction of X-051's prompt regime. The interpretation is appropriately narrow: it supports >=0.8 success on these dev tiers under the listed idealizations, while explicitly not claiming zero composition penalty because both arms are at ceiling and about a 7-point per-tier penalty remains compatible with the CI. Seven scene pairs have byte-identical renders (T1 has only six distinct images), weakening image-level effective n and generalization, but this is disclosed and does not overturn the pre-registered episode-level pass rule; distinct walk seeds still produce distinct full episodes. The paired placement gains (-1.74 cm T0, -1.84 cm T1, reported CIs excluding zero) are secondary and do not substitute for a success-rate superiority claim. Remaining idealizations, including oracle_block_pose, state bridge, scripted/weld grasp, fixed nominal walk start, clean renders and coordinate/camera assumptions, are listed.
+  - surprise: Nothing new beyond RS-027. These remain open as follow-ups:
+- the placement correction failing to converge on T0-dev-06;
+- the duplicate scene renders, which reduce the effective n;
+- perception error e being 0 by construction on layer-0 blocks;
+- walk yaw leaking through the bridge into placement.
+- **RS-029** runs R-101: 0.90 [0.82, 0.94] (n=96); R-100: 0.93 [0.86, 0.96] (n=96)
+  - interpretation: H-021 (rung 2 on T2/T3), applied as filed. Primary batches: R-101 v2_walk vs shared fresh control R-100 v0, on identical pairs (T2 seeds 2000-2047, T3 seeds 2100-2147; 24 scenes, 96 pairs per arm). R-102 and H-022 were deliberately not touched.
+
+VERDICT (threshold order 1->4): threshold 3 fires, NOT CLEARED / PARTIAL. Rung 2 is not cleared on T2/T3. T3 = 42/48 falls in the 39-43 band. The refute line (<=38) is not met, and T2 = 44/48 is exactly at the pass line. This verdict is CONDITIONAL on the V2/V3 coverage audit listed below: if any void rule fires, the result becomes VOID (and so does H-022, through the shared v0).
+
+VOID CHECKS
+- V1 PASS. Both runs have run_fingerprint 0b4bba36...b13b, git_head 76cc1a7e..., workspace 432aef91...6506, and identical native-extension sha256s. Per-episode fingerprints match on every line read. R4: R-100 (09:54:16Z) and R-101 (09:56:03Z) are the only v0 and v2_walk batches on X-061, so both are primary.
+- V2 PARTIAL. walk_end_base_xy and walk_end_base_yaw_deg are present in all 13 R-101 episodes inspected (lines 1-12 plus the re-render). The other 83 are UNVERIFIED.
+- V3 PARTIAL. scene_files_sha256 (7 files per scene) is present in every episode line read from both arms, and T2-dev-01 hashes are byte-identical between R-100 and R-101. NOT DONE: comparison against the committed bytes at 76cc1a7, and the post-batch on-disk rehash. This analyst session is read-only (shell denied by policy), so it can't hash files or run git. E-018 did the equivalent check for T0/T1 only.
+
+TALLIES (Wilson 95%)
+- v2_walk T2 44/48 = 0.917 [0.805, 0.967]; T3 42/48 = 0.875 [0.753, 0.941]; pooled 86/96 = 0.896 [0.819, 0.942].
+- v0 T2 45/48 = 0.938 [0.832, 0.979]; T3 44/48 = 0.917 [0.805, 0.967]; pooled 89/96 = 0.927 [0.857, 0.964].
+- Note: v2_walk T2 meets the >=44 rule, but its Wilson lower bound (0.805) is only just above the 0.8 the pre-reg cites. The T3 lower bound is 0.753.
+
+PAIRED vs v0 (effect size)
+- T2 -1/48 (-2.1 pts); T3 -2/48 (-4.2 pts); pooled -3/96 (-3.1 pts).
+- Exact McNemar is bounded without enumerating pairs, because b - c is fixed by the tallies. T2: b - c = 1, so two-sided p = 1.0 for every possible split. T3: b - c = 2, so p >= 0.5 (minimum at b=2, c=0).
+- The composition penalty is NOT RESOLVED on these n. The data are compatible with zero penalty and also with the <=2-per-tier penalty the pre-reg predicted (T3 has at least 2 discordant v2_walk-only failures).
+- Paired block-error difference: not computed (needs the scripted pass below). Run level: median block pos err v2_walk 1.87 cm vs v0 1.96 cm; block success 95.3% vs 95.8%.
+
+PREDICTION CHECK: the predicted ">=46/48 per tier" and "v0 at ~47-48" both missed. The fresh v0 control itself is only 44/48 on T3. T2/T3 are harder for the shared scripted arm than T0/T1 were (96/96 there).
+
+IDEALIZATIONS STILL IN USE (v2_walk): oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, fixed_nominal_walk_start. The last one is in use (robot_start_pose fixed at [-1.5,0,0.52], walk_start null in every line read) but is MISSING from R-101's idealizations list. v0 additionally uses fixed_base.
+
+PENDING (needs a shell-capable engineer, read-only): one script over both episodes.jsonl files that produces (a) the V2 count over 96, (b) the V3 rehash vs `git show 76cc1a7:scenes/dev/*` plus the on-disk rehash, (c) the per-pair success join -> exact b/c and McNemar per tier, (d) the paired block pos_err difference with a bootstrap CI, (e) per-episode H-021 attribution for all 10 failures, and (f) walk tails per tier and pooled.
+  - failures: FAILED EPISODES (count episodes, never failure_categories): v2_walk 10 (T2 4, T3 6); v0 7 (T2 3, T3 4). The runner tags every one of them 'placement_error', a coarse runner label that is not the H-021 class.
+
+H-021 attribution (walk > placement > settle, first match wins). Done for 1 of 10 so far:
+- T2-dev-01 s2002 -> class 2 PLACEMENT, SHARED. Walk within limits (XY 0.68 cm, yaw -0.46 deg). Block b0 lands short toward the robot: final err 3.44 cm (dx -3.4, dy -0.7 cm), pre-release err already 3.26 cm. v0 fails the SAME pair on the SAME block (b0 3.65 cm, pre-release 3.45 cm). This is the scripted arm's placement bias, which v0 shares. The walk did not cause it, and actually left b0 2 mm closer than v0.
+- Re-render reproduces the logged episode bit-for-bit (same walk-end pose and block errors), consistent with E-020 determinism.
+- Codex contact-sheet read: 'no visible failure, blocks upright, no drop/topple'. That fits a ~3.4 cm sub-visual offset rather than a gross failure.
+
+Are v2_walk's extra failures walk-caused? NOT YET DETERMINED. At least 1 extra on T2 and at least 2 on T3 are v2_walk-only failures, and their walk-end XY/yaw has not been read. The one failure inspected is shared and placement-caused.
+
+WALK TAILS (descriptive; sample of 13/96 v2_walk episodes, T2-dev-01..03 only; NOT the pre-registered full table):
+- XY error: max 1.43 cm; values 0.31-1.43 cm; 0 over 3 cm.
+- |yaw|: max 8.6 deg (T2-dev-02 s2006); 0 at >=10 deg. Two of 13 are >7 deg (7.0 and 8.6), so the yaw tail sits closer to the 10 deg line than XY does to 3 cm.
+- The full-96 max / p95 / p90 and counts per tier are pending the scripted pass.
+  - review: pending by -: 
+  - surprise: 1) The fresh v0 control is only 44/48 on T3 and 45/48 on T2, after 96/96 on T0/T1 (R-099). Most of v2_walk's shortfall vs its own prediction is shared scripted-arm placement error, not the walk. Rung 2 on T3 is limited by the rung it builds on.
+2) R-101's recorded idealizations omit fixed_nominal_walk_start, which H-021 lists and the episodes show is in use. This is a record-metadata gap; fix it before any rung-2 claim is exported.
+3) A sub-cm walk still yields a failure, because b0's pre-release error (~3.3 cm) is already past tolerance before release in both arms. That points at the scripted arm's reach/pitch-45 placement on T2-dev-01, not at the base.
+- **RS-030** runs R-101: 0.90 [0.82, 0.94] (n=96); R-100: 0.93 [0.86, 0.96] (n=96)
+  - interpretation: ADDENDUM TO RS-029. It closes every PENDING item, using the engineer's full read-only audit (/tmp/rs029_audit.py over R-100 and R-101 episodes.jsonl).
+
+VOID CHECKS: ALL PASS. H-021 is VALID, and the shared v0 R-100 is VALID.
+- V1 pass (RS-029).
+- V2: walk-end XY and yaw present in 96/96 v2_walk episodes.
+- V3: 1,344 scene-hash entries (672 per arm), all matching the 76cc1a7 blobs, with 0 missing or mismatched.
+
+VERDICT (unchanged, now unconditional): H-021 threshold 3, NOT CLEARED / PARTIAL.
+- T2 44/48 = 0.917 [0.805, 0.967]: meets the >=44 rule.
+- T3 42/48 = 0.875 [0.753, 0.941]: in the 39-43 band.
+- Rung 2 is not cleared on T2/T3.
+
+PAIRED 2x2 (v2_walk vs v0; both succeed / v2 only / v0 only / neither)
+- T2: 43 / 1 / 2 / 2. Exact McNemar b=1, c=2, p = 1.0.
+- T3: 42 / 0 / 2 / 4. b=0, c=2, p = 0.5.
+- Net: -1 on T2, -2 on T3. NOT RESOLVED. There are only 3 discordant pairs on T2 and 2 on T3, so the test has essentially no power at this n. The pre-reg's predicted composition penalty (<=2 v2-only failures per tier) is met: 2 on T2 and 2 on T3.
+
+PAIRED BLOCK-ERROR DIFFERENCE (v2 - v0), median with 95% CI
+- T2: -0.099 cm [-0.114, -0.076]; T3: -0.097 cm [-0.108, -0.071].
+- On the typical pair, walking + bridge places blocks ~1 mm CLOSER than the fixed base. The difference is resolved but practically negligible (tolerance 3 cm). There is no systematic placement harm from the bridge.
+- The success deficit therefore lives in the tail (a few blocks pushed past 3 cm), not in a mean shift.
+
+WALK TAILS (all 96)
+- XY: max 3.95 cm, p95 2.60, p90 2.16; 3/96 over 3 cm.
+- |yaw|: max 14.0 deg, p95 7.2, p90 6.4; 3/96 at >=10 deg.
+- Prediction "<=4/96 each" met. Prediction "none of them causing a failure" FAILED: 1 outlier (T2-dev-06 s2013) caused a failure. The other outliers sit on passing episodes, so they are walk_drift_absorbed. The audit summary did not give them by pair, so the per-pair list is still owed.
+
+SUCCESSOR DIRECTION (per pre-reg threshold 3): the dominant attribution class is PLACEMENT (9/10 v2_walk failures; 6 of those are shared with v0), not walk (1/10). So the D-015 XY-fix line is NOT the blocker for T2/T3. The next lever is the scripted arm's placement tail, which v0 shares (v0 T3 is itself only 44/48). A heading term for the walk is secondary and would at most recover 1 episode here.
+
+IDEALIZATIONS STILL IN USE (v2_walk): oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, fixed_nominal_walk_start. RECORD DEFECT: R-101's idealizations metadata omits fixed_nominal_walk_start. Every episode has walk_start=null and robot_start_pose fixed at [-1.5, 0, 0.52], so it is in use. Any export of rung-2 status must list it. The run record should be corrected by the runner and not edited here.
+  - failures: 10 v2_walk FAILED EPISODES (T2 4, T3 6), each with one H-021 primary class.
+
+SHARED with v0, class 2 placement (6):
+- T2-dev-01 s2002, T2-dev-11 s2016, T3-dev-19 s2121/s2122, T3-dev-21 s2125/s2127.
+- These are the scripted-arm placement bias that v0 shares, not walk-related. Example s2002: b0 pre-release error is already 3.3 cm in both arms.
+
+v2-ONLY (v0 passes the pair) (4):
+1. T2-dev-06 s2013, class 1 WALK.
+   - Walk-end XY 3.51 cm (> 3.0) and yaw +14.0 deg (>= 10). Telemetry: walk_end (-0.164, +0.032), speed 0.106 m/s, i.e. still moving.
+   - All 3 blocks are displaced in the same direction (-y): b0 2.53, b1 3.18, b2 3.50 cm. b2's pre-release error is already 3.84 cm (y 0.092 vs 0.130), so the arm carried b2 to the wrong spot before release.
+   - A same-sign lateral error on every block, growing along the row, is the signature of an uncorrected base pose error, not random placement noise.
+   - Visual (codex on the contact sheet): the orange block sits 'separated to the right of the white-blue row', i.e. a visible gap in the row. That matches the telemetry. Codex's 'grasp not secured' label is DISCOUNTED: under weld_grasp the block was carried to a logged pre-release pose at the target height.
+2. T2-dev-25 s2037, class 2 placement (walk 0.8 cm / -3.4 deg). b2 3.32 cm vs v0 1.53 cm.
+3. T3-dev-03 s2108, class 2 placement (walk 0.8 cm / +2.9 deg). b2 4.09 cm vs v0 2.81 cm.
+4. T3-dev-40 s2135, class 2 placement (walk 1.1 cm / +0.1 deg). b2 3.25 cm vs v0 1.52 cm.
+
+ANALYST JUDGEMENT on 2-4 (clean walk, one worse block): NOT DETERMINABLE from this data. Leaning toward chance in the placement tail plus base-height/tilt pass-through, with a plain bridge XY/yaw error the least likely.
+- Against XY/yaw: s2135's walk is essentially perfect (1.1 cm, 0.1 deg) and still fails. The paired median difference is -0.1 cm with a tight CI, so the bridge does not shift typical placements.
+- For a height/tilt effect: the bridge passes Sumo's terminal z, roll and pitch into assembly (assembly z varies ~0.414-0.430 m across episodes, while v0 has a fixed base). With the pitch-45 scripted approach, a few mm of base height or ~1 deg of tilt could move a release point by ~1-2 cm. It is notable that all three hit block b2 (the last placed), which needs to be explained.
+- For chance: v0's own error on those blocks is 1.5-2.8 cm, i.e. already 50-90% of the 3 cm tolerance. A ~1.5 cm perturbation from any source tips them over. Only 3 events, so no attribution claim.
+- Cheap discriminating check (proposed, not run): across all 96 pairs, regress the per-block error difference (v2 - v0) on the bridge's assembly_base z, roll and pitch, and on block index. If the b2 / z dependence holds, it is the bridge (height/tilt). If it doesn't, it's chance.
+
+SUMMARY: walk 1, placement 9 (6 shared + 3 v2-only), settle/orientation 0. v2_walk's net extra failures (T2 +1, T3 +2 vs v0): 1 is walk-caused, and 3 are clean-walk single-block tail events of undetermined cause. Most of the deficit vs the >=44 line on T3 is shared placement (4 of the 6 T3 failures are shared).
+  - review: accept by reviewer: ACCEPT RS-030 as the addendum completing RS-029. H-021 was created at 1791107525.986, before the first evaluated capture (R-100 at 1791107656.246; R-101 later), so its thresholds and attribution rules are pre-registered, not post-hoc. R-100 is an appropriate fresh control: R-100 and R-101 use the identical 96 (scene, seed) pairs (T2 2000-2047, T3 2100-2147), the same 24 development scenes, git head 76cc1a7 and fingerprint 0b4bba36; E-019 records the pre-run seed gate PASS. Both runs are final_eval=false and contain only `-dev-` scenes, so no held-out scene was used. Recomputed pooled metrics for the two runs agree with their records (175/192 overall; T2 89/96, T3 86/96), and the per-run records agree with RS-030: R-101 is 44/48 T2 and 42/48 T3, while R-100 is 45/48 and 44/48. The reported Wilson intervals are correct. Applying H-021 in its filed order, T3=42/48 fires threshold 3 (39-43), hence NOT CLEARED / PARTIAL and H-021 remains open; T2=44/48 meets its tier line but cannot clear both tiers. The paired tables are reproduced by the read-only audit (T2 43/1/2/2; T3 42/0/2/4), so exact McNemar p=1.0 and 0.5 and the success difference is correctly described as unresolved. The paired episode-mean block-error medians and bootstrap CIs also reproduce: about -0.099 cm [-0.114,-0.076] on T2 and -0.097 cm [-0.108,-0.071] on T3, a statistically resolved but practically negligible typical-pair effect. V2 is complete in 96/96. V3's 1,344 logged entries reproduce as 0 missing/mismatched against the committed blobs; a separate read-only worktree check finds no changed or untracked files under scenes/dev relative to 76cc1a7, closing the filed post-batch on-disk condition. Under H-021's descriptive first-match rule, the 10 failures classify exactly as 1 walk and 9 placement, with 6 placement failures shared with v0: T2-dev-06 seed 2013 exceeds both walk cutoffs (3.514 cm, 13.991 degrees), has failing-block displacement above 1.5 cm, and v0 passes; every other failed episode is within walk limits and has a failing block above 1.5 cm. Its telemetry also supports the narrative (0.1064 m/s terminal speed and b2 pre-release error 3.841 cm). 'Walk-caused' should be understood as the pre-registered descriptive attribution, not randomized causal identification. The base-z/roll/pitch bridge explanation is properly labeled NOT DETERMINABLE/speculative and the discriminating regression is explicitly proposed but not run. All continuing idealizations are listed, including fixed_nominal_walk_start; RS-030 correctly flags that R-101's metadata omits it even though the per-episode walk stage fixes robot_start_pose at [-1.5,0,0.52] with walk_start=null. The interpretation does not clear rung 2 or claim a resolved success penalty.
+  - surprise: 1) The bridge makes TYPICAL placement slightly better (-0.1 cm median, CI excludes 0), yet 3 of the 4 v2-only failures are clean-walk episodes with one block pushed ~1.5 cm further than v0, all on b2. A tail effect without a mean shift points at something episode-specific (base z/tilt pass-through) or chance, not at a bias.
+2) The walk-caused failure ended with the base still moving (0.106 m/s) and displaced all three blocks the same way. One bad walk end turns into a whole-structure lateral shift, so 'absorbed by the bridge' (as on T0/T1, RS-028) does not hold beyond ~3.5 cm / 14 deg.
+3) R-101 idealizations metadata omits fixed_nominal_walk_start (record defect, confirmed).
+- **RS-031** runs R-103: 0.98 [0.93, 0.99] (n=96); R-104: 0.97 [0.91, 0.99] (n=96)
+  - interpretation: X-063 = H-022's confirmatory rerun, under the PI ruling (H-022 note 2) that voided R-102 under V1. Arms: R-103 v6_combo (rungs 1+2+5) vs R-104 fresh v0. Both at 15686c1, fingerprint 1163ff1a…c24e, max_workers=6. 96 identical pairs: T2 seeds 4000-4047, T3 seeds 4100-4147. Seed gate E-021 passes.
+
+VOID CHECKS (E-022, engineer's read-only audit): V1-V4 ALL PASS.
+- V1 (the full fingerprint including git_head): same in both arms, with no commit during the window.
+- V2: 96/96 complete. n/a_mismatch counts as present (1 episode).
+- V3: 672/672 scene hashes per run match.
+- V4: 1 prompt hash, and cached=false 96/96.
+- R4: these are the only v6_combo and v0 batches at this fingerprint, so both are primary.
+
+VERDICT, applying thresholds 0-5 in order:
+- 0 cannot fire (D-017). 1 does not fire.
+- 2 does not fire: no failed episode has primary class 'order'.
+- 3 and 4 do not fire.
+- 5: SUPPORTED. The combined ladder (rungs 1+2+5) is cleared on T2/T3 dev under the idealizations listed below.
+
+TALLIES (Wilson 95%)
+| Arm | T2 | T3 | Pooled |
+|---|---|---|---|
+| v6_combo | 46/48 = 0.958 [0.860, 0.988] | 48/48 = 1.000 [0.926, 1.000] | 94/96 = 0.979 [0.927, 0.994] |
+| v0 | 46/48 = 0.958 [0.860, 0.988] | 47/48 = 0.979 [0.891, 0.996] | 93/96 = 0.969 [0.912, 0.989] |
+Both T2 lower bounds (0.860) are above the 0.8 the pre-registration cites.
+
+PAIRED vs v0 (both pass / v6-only pass / v0-only pass / both fail)
+- T2: 44/2/2/0, exact McNemar p = 1.0.
+- T3: 47/1/0/0, p = 1.0.
+- Pooled: 91/3/2/0, p = 1.0.
+- Effect sizes: T2 +0.0 pts, T3 +2.1 pts, pooled +1.0 pt. Crude paired 95% CI on the pooled difference is about [-3.5, +5.6] pts.
+- NOT RESOLVED: only 5 discordant pairs out of 96. Neither superiority nor a zero composition penalty is shown. The data fit both "no penalty" and "a penalty of a few points".
+
+SECONDARY
+- Run-level median block position error: v6_combo 0.33 cm vs v0 1.94 cm. Same direction as RS-027/028 (the closed-loop place removes the scripted-arm bias).
+- The per-pair paired block-error difference with a CI was NOT computed: it was not in E-022, and this session cannot run scripts. It is owed.
+
+PER STAGE (v6_combo)
+- Perception: 359/360 true blocks matched, 1 missing, 1 spurious. Structure matched in 95/96 episodes.
+- Order: support_valid_true is true 95/95 on matched episodes (plus 1 n/a_mismatch). Zero planner errors on the failures read.
+- Matched |e| on the two failed episodes: 0.03-0.10 cm.
+- Caveat (RS-027): e is 0 by construction on layer-0 blocks.
+- Walk: walk_drift_absorbed in 5/96 (all passing episodes), plus 1 more walk-yaw outlier (s4018, +15.1 deg) on an episode that failed for a perception reason. Full XY/yaw quantiles per tier are NOT in E-022 and are owed.
+
+PREDICTION CHECK
+- MET: v6_combo T2 >= 45 (46) and T3 >= 44 (48); zero 'order' classes; support_valid_true true on every matched episode.
+- PARTLY MET: both failures are in predicted classes (perception_structure and placement). The details differ: a 3-block tower rather than a 4-6-block pyramid, and a disturbance after release rather than the correction failing to converge.
+- MISSED on T2: "v0 about 47-48" (T2 was 46).
+- N/A: the v2_walk comparisons, since there is no v2_walk arm in this rerun.
+
+DISCLOSURES
+- R-102 (v6_combo, git_head bd304ad) was VOIDED under V1 as written. The void is procedural: the hashed content was identical. It is EXPLORATORY only, with tallies T2 47/48 and T3 46/48. Those were seen before this rerun was specified, and the predictions were not revised. Combined with R-102 the picture is unchanged (both runs >= 46/48 per tier), but R-102 is not pooled into this result.
+- RS-029/RS-030 (H-021: v2_walk T3 42/48, shared v0 R-100 at 45 and 44) were known when the rerun was specified.
+- The prompt nonce was removed at 76cc1a7 and is absent at 15686c1. The claim therefore applies to v6_combo as frozen, not to the X-051 prompt regime with a per-call nonce. Responses stayed uncached and varied per seed.
+- Both arms ran with max_workers=6 (committed before the freeze). Parallel determinism evidence is E-020 only: 8 v2_walk episodes on T0, 8 workers. NOT exercised: v6_combo or T2/T3 in parallel. The engineer's serial-vs-parallel parity check for this configuration is NOT in E-022 and has not been received. Until it is, parity for v6_combo on T2/T3 is assumed and not shown. This does not void the result (it is not a V-rule), but it is a stated gap.
+- The effective n may be below 48 per tier if T2/T3 scenes share renders, as T1 did (RS-027). Not checked for T2/T3.
+
+IDEALIZATIONS STILL IN USE (v6_combo): oracle_block_pose (the closed-loop correction reads ground-truth block pose), weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge (XY reset to nominal; yaw, z, roll and pitch carried through), fixed_nominal_walk_start, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera. fixed_base is dropped. v0 additionally uses oracle_structure_spec, oracle_build_order and fixed_base.
+  - failures: 2 FAILED v6_combo EPISODES, each with one primary class. Both are T2, both are v6-only (v0 passes both pairs), and both match E-022. The runner's failure_categories adds up to 4 only because s4018 carries three tags.
+
+1. T2-dev-11 s4018: PERCEPTION_STRUCTURE (rule C2).
+- The VLM read the true base b0, a white CUBE, as a white BRICK. The matcher logs b0 as missing and the brick as spurious.
+- The planner ordered the perceived spec validly (support_valid_perceived true, no planner error). support_valid_true is n/a_mismatch, so the class is perception_structure, not order.
+- Physically, b0 was never picked up: its final pose is its start, 37 cm from target. b1 and b2 were released at their targets (p_xy 0.15 and 0.07 cm) and fell one layer (p_z about -10 cm), leaving a 2-block tower.
+- Walk yaw was +15.1 deg (XY 0.19 cm). This is a tail outlier, but not causal: both placed blocks were corrected to <= 0.15 cm.
+- The other T2-dev-11 seeds use the same image and passed. The misread varies from call to call on the same image (same pattern as RS-026's cyan-brick split); it is not a fixed property of the scene.
+- Codex on the contact sheet: "purple placed as base, red on top, two-block structure upright". Consistent with the logs.
+
+2. T2-dev-12 s4023: PLACEMENT.
+- Structure matched, support_valid_true true, perception |e| <= 0.043 cm, walk clean (0.72 cm, +1.5 deg).
+- b0 was released 0.6 cm from target (correction converged to 0.67 cm remaining) but ended at -5.8 cm lateral residual. It moved about 6.4 cm in -y AFTER release.
+- b1's initial pre-release error was 5.7 cm toward the centre of the structure (v0 on this pair: 2.5 cm). Its first correction commanded +3.9 cm in y.
+- INFERRED mechanism: the welded b1 was lowered into the neighbouring b0 and pushed it sideways before the correction moved b1 back. The closed-loop stage corrects only the block being held. It never re-checks blocks already placed.
+- v0 on the same pair also moved b0 by -0.8 cm after release, so the contact exists in both arms and is larger in v6_combo.
+- Why b1's initial error was larger in v6_combo is NOT DETERMINED. Candidates are the bridge's z/roll pass-through (assembly z 0.414 m, roll about -1.2 deg; see RS-030) or chance.
+- Codex on the contact sheet: "no visible failure; orange untouched". DISCOUNTED: the logs show b2 placed 0.18 cm from target, so the codex read misses events. The shove is NOT visually confirmed; a human should check the GIF.
+
+By class: perception_structure 1, placement 1; perception_localization 0, order 0, walk 0, settle/orientation 0.
+v0 failures (3: T2 2, T3 1) are all runner 'placement_error' on pairs where v6_combo passes. Not attributed further, since H-022 classifies only v6_combo.
+  - review: accept by reviewer: ACCEPT, narrowly and only for the pre-registered T2/T3 dev claim under the recorded idealizations. H-022 was created at 1791107551, before the original X-061 runs, and its dated rerun amendment was recorded at 1791114146, before R-103's fingerprint capture at 1791114770 and R-104's at 1791115475. The amendment disclosed that R-102 (47/48 T2, 46/48 T3) and RS-029/RS-030 were already known, retained the thresholds/predictions, prescribed fresh consecutive seeds and one primary batch per arm, and changed both arms to max_workers=6 before the freeze; this makes the rerun pre-specified rather than post-hoc. Prior knowledge weakens novelty but does not create a selective construction: E-021 clears the filed seeds, and R-103/R-104 contain exactly the same 96 filed scene-seed pairs (T2 4000-4047; T3 4100-4147), the same full fingerprint 1163ff1a...c24e / git head 15686c1, and no alternate primary batches. E-022 reports V1-V4 pass, complete telemetry, matching scene hashes, one prompt hash, cached=false throughout, and no order-class failure. A fresh same-configuration v0 control therefore exists and is properly matched. All scenes are explicitly split=dev and both runs are final_eval=false; no held-out scene appears.
+
+Independent recomputation matches RS-031: R-103 is 94/96 overall, T2 46/48 and T3 48/48, pooled Wilson 95% CI [0.9272,0.9943]; R-104 is 93/96, T2 46/48 and T3 47/48, pooled CI [0.9121,0.9893]. The reported per-tier Wilson intervals are also correct: v6_combo T2 [0.860,0.988] and T3 [0.926,1.000]. Thus both pre-registered absolute tier gates are cleared with lower bounds above 0.8, and 95/95 structurally matched v6 episodes have support_valid_true=true. The data do not resolve a difference from v0: the paired table has only five discordances (91/3/2/0 pooled), exact McNemar p=1.0, and overlapping uncertainty; RS-031 explicitly says neither superiority nor zero composition penalty is established.
+
+The six-worker evidence is adequate only as a caveat, not a general determinism demonstration: E-020 covers eight v2_walk/T0 episodes, while the additional freeze check described by the PI covers six replayed R-098 v6_combo T0/T1 episodes plus one v0 episode; neither tests v6_combo on T2/T3. This does not bias selection because worker count was filed before R-103/R-104 and applied to both arms, but the accepted claim is about the frozen six-worker configuration, not proven serial equivalence. Scope is further limited by the disclosed idealizations, especially oracle_block_pose for closed-loop correction, plus weld_grasp, scripted_arm, no_arm_block_collision, the Sumo-to-assembly bridge, fixed nominal walk start, clean distinct-color renders, x/yaw/grid assumptions, and known target camera. Therefore H-022 is supported only as clearance of combined rungs 1+2+5 on these T2/T3 dev scenes under those conditions; it is not a superiority, held-out, real-world, or de-idealized claim.
+  - surprise: 1) A NEW failure route. A carried block knocked an already-placed block 6 cm after the correction had converged (s4023). The predicted placement risk was the correction not converging (s1444). This route is sensitive to no_arm_block_collision and weld_grasp, so the remaining failure rate is probably underestimated. A per-step re-check of placed blocks would catch it under oracle_block_pose.
+2) The fresh v0 control is much stronger on T3 than R-100 was: 47/48 vs 44/48 on different seeds of the same scenes. On T2/T3 the shared-control rate swings between seed blocks by about as much as the effects being measured. Cross-batch comparisons of v0 are not reliable at this n.
+3) Perception type confusion (cube vs brick, same colour) is now the recurring perception_structure mode: RS-026 (cyan) and here (white). Both vary per call on an image that is otherwise parsed correctly.
+4) Codex's rollout reader missed a 6 cm displacement and claimed an untouched block that was in fact placed. Do not use it as a failure detector without telemetry.
 
 ## Runs
 
@@ -893,6 +1677,31 @@ Independently, the PARTIAL rule requires median |e| <=1.0 cm and X-037 pre-regis
 | R-077 | X-037 | v46_vlm_measure | 80d4b35+state.532c8e6b | 40 | 0.95 [0.83, 0.99] (n=40) | 1094 | oracle_build_order, oracle_block_pose, fixed_base, weld_grasp, no_arm_block_collision, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer |
 | R-078 | X-037 | v46_vlm_measure | 1c4abe0+state.04aa7ff8 | 16 | 0.69 [0.44, 0.86] (n=16) | 662 | oracle_build_order, oracle_block_pose, fixed_base, weld_grasp, no_arm_block_collision, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer |
 | R-079 | X-037 | v0 | aa5cc95+state.ad9320ff | 16 | 0.62 [0.39, 0.82] (n=16) | 1782 | oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision |
+| R-080 | X-040 | v2_walk | 1f465a4+state.0d729d0e | 20 | 1.00 [0.84, 1.00] (n=20) | 462 | oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge |
+| R-081 | X-040 | v0 | 1f465a4+state.0d729d0e | 20 | 1.00 [0.84, 1.00] (n=20) | 2100 | oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision |
+| R-082 | X-043 | v4_mpc | c733d69+state.7f6eaa11 | 24 | 0.00 [0.00, 0.14] (n=24) | 204 | oracle_structure_spec, oracle_build_order, oracle_block_pose, fixed_base, weld_grasp, no_arm_block_collision, sumo_to_assembly_state_bridge (teleport lab block to Sumo terminal pose, never snap to goal) |
+| R-083 | X-043 | v0 | c733d69+state.7f6eaa11 | 24 | 1.00 [0.86, 1.00] (n=24) | 3402 | oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision |
+| R-084 | X-045 | v46_vlm_measure | c733d69+state.7f6eaa11 | 72 | 0.89 [0.80, 0.94] (n=72) | 633 | oracle_build_order, oracle_block_pose, fixed_base, weld_grasp, no_arm_block_collision, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer |
+| R-085 | X-045 | v46_vlm_measure | c733d69+state.7f6eaa11 | 72 | 0.88 [0.78, 0.93] (n=72) | 659 | oracle_build_order, oracle_block_pose, fixed_base, weld_grasp, no_arm_block_collision, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer |
+| R-086 | X-042 | v3_grasp_lift | c733d69+state.7f6eaa11 | 96 | 0.38 [0.28, 0.47] (n=96) | 7649 | oracle_structure_spec, oracle_build_order, oracle_block_pose, fixed_base, scripted_arm |
+| R-087 | X-045 | v0 | c733d69+state.7f6eaa11 | 72 | 0.89 [0.80, 0.94] (n=72) | 2819 | oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision |
+| R-088 | X-042 | v3_grasp | c733d69+state.7f6eaa11 | 96 | 0.38 [0.28, 0.47] (n=96) | 8531 | oracle_structure_spec, oracle_build_order, oracle_block_pose, fixed_base, scripted_arm |
+| R-089 | X-046 | v2_walk_xy | b42df27+state.4995f230 | 16 | 1.00 [0.81, 1.00] (n=16) | 497 | oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge |
+| R-090 | X-046 | v2_walk_settle | b42df27+state.4995f230 | 16 | 1.00 [0.81, 1.00] (n=16) | 426 | oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge |
+| R-091 | X-048 | v2_walk | b42df27+state.4995f230 | 48 | 1.00 [0.93, 1.00] (n=48) | 448 | oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge |
+| R-092 | X-048 | v0 | b42df27+state.4995f230 | 48 | 1.00 [0.93, 1.00] (n=48) | 6890 | oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision |
+| R-093 | X-053 | v2_walk_xy | 319a838+state.548aeccd | 16 | 1.00 [0.81, 1.00] (n=16) | 92 | oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge |
+| R-094 | X-051 | v47_vlm_anchor | 319a838+state.548aeccd | 40 | 0.97 [0.87, 1.00] (n=40) | 338 | oracle_build_order, oracle_block_pose, fixed_base, weld_grasp, no_arm_block_collision, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera |
+| R-095 | X-053 | v2_walk_settle | 319a838+state.548aeccd | 16 | 0.94 [0.72, 0.99] (n=16) | 105 | oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge |
+| R-096 | X-051 | v0 | 319a838+state.548aeccd | 16 | 0.94 [0.72, 0.99] (n=16) | 715 | oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision |
+| R-097 | X-055 | v6_combo | 2235bf7+state.8d48c009 | 96 | 0.99 [0.94, 1.00] (n=96) | 129 | oracle_block_pose, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, fixed_nominal_walk_start, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera |
+| R-098 | X-058 | v6_combo | 76cc1a7+state.0b4bba36 | 96 | 1.00 [0.96, 1.00] (n=96) | 189 | oracle_block_pose, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, fixed_nominal_walk_start, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera |
+| R-099 | X-058 | v0 | 76cc1a7+state.0b4bba36 | 96 | 1.00 [0.96, 1.00] (n=96) | 2899 | oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision |
+| R-100 | X-061 | v0 | 76cc1a7+state.0b4bba36 | 96 | 0.93 [0.86, 0.96] (n=96) | 4559 | oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision |
+| R-101 | X-061 | v2_walk | 76cc1a7+state.0b4bba36 | 96 | 0.90 [0.82, 0.94] (n=96) | 366 | oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge |
+| R-102 | X-061 | v6_combo | bd304ad+state.07ffd6c8 | 96 | 0.97 [0.91, 0.99] (n=96) | 85 | oracle_block_pose, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, fixed_nominal_walk_start, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera |
+| R-103 | X-063 | v6_combo | 15686c1+state.1163ff1a | 96 | 0.98 [0.93, 0.99] (n=96) | 544 | oracle_block_pose, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, fixed_nominal_walk_start, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera |
+| R-104 | X-063 | v0 | 15686c1+state.1163ff1a | 96 | 0.97 [0.91, 0.99] (n=96) | 4747 | oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision |
 
 ## Experiments (candidates, selected, rejected)
 
@@ -1011,6 +1820,34 @@ Preconditions:
 - **X-037** [selected] tests H-013 with v46_vlm_measure vs v0. PART A (40 eps, all fresh v46): T1-dev-01..12 (confirmatory) + old off-grid T2-dev-11..14, T3-dev-13..16 (exploratory), seeds 0-1. v0 controls reused and paired by (scene, seed): R-005 (T1-01..06), R-017 (T1-07..12), R-035 (off-grid 8). PART B (32 eps): fresh confirmatory off-grid T2-dev-15..18, T3-dev-17..20, seeds 0-1, v46 (16) + fresh v0 (16), same commit. No v46 run on Part B scenes before this experiment (query_record kind=run contains=v46 was empty at filing). on 28 scenes, 72 episodes. Expected learning: BASELINE (A+B). The confirmatory rung-5 verdict vs v0 only (amendment 1) comes from T1 24 eps plus the 16 fresh off-grid eps in Part B. These scenes were never used to tune the white-mask fix, which the reviewer flagged on an off-grid gate scene. Part A off-grid (16 eps) keeps the pre-registered mechanism clauses checkable: the staircase b2 on T2-dev-11 / T3-dev-14 with e > 3 cm is a REFUTED clause, and so is the off-grid median |e|. Those results are exploratory because of the Gate 0 contamination. They also tie back to RS-012's failure set. 'BEATS v45' (R-033) is exploratory only. Decisions: off-grid fresh >= 14/16 with T1 >= 23/24 and median |e| <= 1.0 cm supports clearing rung 5 on off-grid. Median |e| > 1.0 cm with a success gain attributes the gain to placement, not perception. Old-vs-fresh off-grid divergence (old passes, fresh fails) flags overfitting of the mask fix. Per-block split logged: e = perceived y - true y, and placement = final - perceived target.. Cost: 72 episodes (56 v46 + 16 v0). Budget 113 - 32 reserved X-035 = 81 usable, so 9 slack remains after this run. That covers the optional +8 seed-2 add-on but nothing else. Wall time: about 72 x 0.5-3 s of sim on 8 workers (~1-4 min), plus 56 fresh VLM calls (cache_mode fresh_per_seed) at 10-60 s each (~10-55 min, dominant). No Sumo.. X-037 (72 eps; 113 left, 32 reserved for X-035, so 81 usable and 9 slack after) is the only design that gives a clean confirmatory verdict vs v0 on scenes the mask fix never saw (T1 24 + fresh off-grid 16 with a fresh matched v0). It also keeps the pre-registered staircase-b2 and median-|e| REFUTED clauses checkable on the old off-grid scenes, reported as exploratory because of the Gate 0 contamination. X-038 saves 16 eps but drops a pre-registered refutation clause after Gate 0 was seen, and it loses the old-vs-fresh overfitting check. X-039 saves 8 eps by imputing v0 seed 1 on the confirmatory arm, which is the arm that most needs a measured control. PRECONDITIONS before the first episode: (1) amend H-013 with a timestamp: 72-ep cap (the record says 60), Part B scenes confirmatory, Gate 0 and old off-grid exploratory, verdict vs v0 only, 'beats v45' exploratory; (2) clean committed tree, checked by the runner preflight, with the commit hash reported; (3) v46 perceive fresh per (scene, seed), with the cached flag + hash logged; (4) a pre-run scene-spec check that the fresh scenes are off the 6.5 cm grid and >=2 are staircases. Labels alone (tower/bridge/L/T/pyramid) can't confirm either. If <2 are staircases, the confirmatory off-grid arm cannot test the staircase mechanism and must say so. Dev only. The optional +8 seed-2 add-on fits the 9 slack exactly; nothing else does.
 - **X-038** [rejected] tests H-013 with v46_vlm_measure vs v0, CONFIRMATORY-ONLY. T1-dev-01..12, seeds 0-1, v46 fresh (24) with v0 reused from R-005/R-017. Fresh off-grid T2-dev-15..18, T3-dev-17..20, seeds 0-1, v46 (16) + fresh v0 (16). Old off-grid scenes T2-dev-11..14 and T3-dev-13..16 are dropped. on 20 scenes, 56 episodes. Expected learning: Same confirmatory verdict as X-037: T1 24 + fresh off-grid 16, vs v0. It saves 16 episodes by dropping the old off-grid scenes, which are contaminated by the Gate 0 tuning. LOSS: the pre-registered REFUTED clause on staircase b2 (T2-dev-11 / T3-dev-14) can't be checked. Nor can the RS-012 failure set or the old-vs-fresh overfitting comparison. If none of the 8 fresh scenes is a staircase (unverified), the staircase mechanism goes untested in sim entirely.. Cost: 56 episodes (40 v46 + 16 v0). Leaves 25 usable after the X-035 reserve. 40 fresh VLM calls (~7-40 min) plus about 1-3 min sim.. 
 - **X-039** [rejected] tests H-013 with Same as X-037, except the Part B v0 control runs seed 0 only on the 8 fresh scenes (8 eps). Seed 1 is imputed from v0 seed invariance (RS-004: v0 bit-reproducible, oracle perception). on 28 scenes, 64 episodes. Expected learning: Same verdict as X-037 for 8 fewer episodes, and only if v0 is truly seed-invariant on these new scenes. The fresh-scene seed-1 pairs would then be matched by assumption, not by measurement. That weakens the confirmatory off-grid comparison, which is exactly the arm the reviewer wants clean.. Cost: 64 episodes (56 v46 + 8 v0). Leaves 17 usable. VLM wall time is the same as X-037 (~10-55 min).. 
+- **X-040** [selected] tests H-014 with X-035 rerun: v2_walk (w_heading=160 frozen) vs FRESH v0, ONE run_sim_batch per method with pairs=[[scene,seed],...]: 16 distinct seeds 0-15 round-robin over T0-dev-01..06 plus T1-dev-01..02 x seeds 0-1 (20 pairs per arm). Both arms same pairs, one frozen commit (current HEAD, record hash), identical lab/ methods/ prompts/ fingerprint, max_workers=1. on 8 scenes, 40 episodes. Expected learning: Clean rung-2 verdict after RS-015 went VOID on mixed commits. Yaw <10 deg on every walk and >=15/16 T0 (out-of-sample >=13/14) moves H-014 toward supported and unlocks rung 3 work with the walk treated as solved at T0. Any yaw >=10 deg sends the walk back to method_designer before more spend. Matched fresh v0 gives the block-error delta without historical-control drift.. Cost: 40 episodes (20 v2_walk + 20 v0). Wall ~3-6 min (Sumo ~9 s/ep at 1 worker). Sumo, so it must not overlap other batches.. Run first: no code change, cheapest (40), unblocks rung 2 after VOID RS-015. Budget plan (501): X-040 40 + X-043 48 + X-042 192 + X-041 72 = 352, reserve 149. X-044 (157+ control, no rung impact, would eat the reserve) deferred/rejected. Conditions: one frozen commit, identical fingerprint, one run_sim_batch per method with pairs, max_workers=1, Sumo not overlapped.
+- **X-041** [rejected] tests H-013 with X-037 rerun: v46_vlm_measure (per-block perceived-position logging; white-mask fix generalised to white cubes on bridges) vs v0, one run_sim_batch per method with pairs=[[scene,seed],...], seeds 0-1, fresh VLM per (scene,seed), one frozen commit, identical fingerprint across arms. on 28 scenes, 72 episodes. Expected learning: Settles H-013 after RS-016 went VOID (bb3a96c changed vlm_measure.py/cache/v46 config mid-run). Per-block e = perceived - true separates perception from placement; T2-dev-16 white-cube bridge is the test of the generalised mask. Fresh off-grid >=14/16 with T1 >=23/24 and median |e|<=1.0 cm supports clearing rung 5 off-grid; otherwise perception stays the blocker. Note v0 got only 10/16 off-grid in the last run, so judge vs matched v0.. Cost: 72 episodes as scoped (56 v46 + 16 v0). Wall dominated by fresh VLM calls, roughly 10-55 min. CAVEAT: under the one-fingerprint rule every v0 control must be fresh; the 72-ep scope only has fresh v0 for the 16 Part B pairs, so Part A (T1 + old off-grid) v0 would be historical and non-matched. Making all 56 pairs matched costs +40 (112 total).. Run once the code is committed and the dated H-013 amendment is filed. It is bound by VLM latency, so it can overlap X-042. 72 eps; +40 for a fully matched v0 would still leave about 109.
+- **X-042** [selected] tests H-010 with X-025: v3_grasp_lift vs FRESH v3_grasp control, seeds 0-7 on T0-dev-01..06 and T1-dev-01..06 (96 pairs per arm), one run_sim_batch per method with pairs, one frozen commit, identical fingerprint. on 12 scenes, 192 episodes. Expected learning: H-010 as pre-registered (T0 and T1 >=39/48, mechanism check: post-release displacement <1 cm). Supported = rung 3 release fixed, T2/T3 spend can resume. Fails with mechanism failing = lift height/geometry. The user's 96 is the treatment arm only; the old R-019/R-020 controls came from other commits, so under the one-fingerprint rule they cannot be reused. Fresh control adds 96.. Cost: 192 episodes strict (96 + 96 fresh control); 96 if R-019/R-020 reuse is waived by the PI (needs a written deviation). Wall ~3-6 min total, non-Sumo, 8 workers.. Third, after the Sumo window, once the smoke episode passes. 192 eps strict (96 if the PI waives reuse of R-019/R-020). May run in parallel with X-041 (both non-Sumo, each pinned to its own commit).
+- **X-043** [selected] tests H-011 with X-022: v4_mpc vs FRESH v0, seeds 0-3 on T0-dev-01..06 (24 pairs per arm), one run_sim_batch per method with pairs, one frozen commit shared with candidate (a), max_workers=1, serial after (a). on 6 scenes, 48 episodes. Expected learning: Rung-4 T0 probe with the pre-registered VOID/NOT CLEARED/AT RISK/CLEARED rule (CLEARED: 24/24, max <=2.7 cm). CLEARED+IMPROVES makes v4_mpc a rung-4 contender; CLEARED only parks it since v4_place is cheaper. User's 24 is the treatment arm; the old R-003 control is on another commit so a fresh v0 (24) is added to satisfy the one-fingerprint rule.. Cost: 48 episodes strict (24 + 24 v0), 24 if reuse is waived. Sumo CEM, ~1-2 min uncontended, worst case 600 s timeout per wave.. Second, serially after X-040 (both Sumo, max_workers=1, same frozen commit allowed). 48 eps with fresh v0 control. Needs bridge audit and H-011 rule filed first.
+- **X-044** [selected] tests H-006 with X-014 remainder: v4_place with x-shortfall fix, 157 episodes on T1-T3 dev scenes, plus a matched fresh v0 control. on 34 scenes, 157 episodes. Expected learning: Tests the x-shortfall fix for H-006, but v4_place is already adopted (D-007, 135/136) and H-006 refuted on its own mechanism; the result would not move a rung and the oracle_block_pose idealization stays. Lowest expected learning.. Cost: 157 episodes treatment only; the one-fingerprint rule needs a fresh v0 on the same pairs (up to ~157 more), so realistically 157-314. It would consume the reserve.. Un-rejected 2026-10-04 on human instruction (episodes are cheap local compute). Full design: v4_place x-shortfall fix on 157 pairs + fresh matched v0 on same pairs = ~314, one frozen commit, identical fingerprint. Pair list re-derived from completed runs. Runs last (non-Sumo), lowest rung impact.
+- **X-045** [selected] tests H-013 with AMENDMENT 2026-10-04 to X-041 (filed before any run; supersedes X-041 scope). v46_vlm_measure vs FRESH v0, one run_sim_batch per method with pairs, seeds 0-1, fresh VLM per (scene,seed), one frozen commit, identical fingerprint across arms. Arm A (matched, 56 pairs x2 = 112): T1-dev-01..12, T2-dev-11..14, T3-dev-13..16, plus T2-dev-15..18 and T3-dev-17..20, now EXPLORATORY because the white-mask fix was tuned on T2-dev-16 and T2-dev-18. Arm B (CONFIRMATORY, 16 pairs x2 = 32): 8 brand-new off-grid scenes from scene_designer (likely T2-dev-19..22, T3-dev-21..24; ids TBD, not yet in scene list so not in scene_ids; must exist and pass scene-spec check before commit freeze), v46 vs fresh v0, seeds 0-1. H-013 verdict rests on Arm B vs matched v0 only. Never held-out scenes. on 28 scenes, 144 episodes. Expected learning: Arm B is the first uncontaminated off-grid test of the white-mask fix; Arm A shows gate regressions and exploratory off-grid effect. Fresh v0 on every pair removes historical-control drift.. Cost: 144 episodes (112 + 32). Non-Sumo, VLM-latency bound ~10-60 min; may overlap X-042.. 2026-10-04 amendment supersedes X-041 (superseded, not a scientific rejection): fully matched fresh v0 on 56 pairs (112) + confirmatory Arm B on 8 new off-grid scenes (+32) = 144. T2-dev-15..18/T3-dev-17..20 exploratory (mask tuned on T2-dev-16/18). Non-Sumo, may overlap X-042. Needs frozen commit + new scene ids first.
+- **X-046** [selected] tests H-016 with v2_walk_xy + v2_walk_settle (stage 1 screen; stage 2 conditional: winner vs v2_walk vs v0) on 6 scenes, 32 episodes. Expected learning: H-016 pre-registered design. STAGE 1 (32 eps, committed now): one run_sim_batch per method (v2_walk_xy, v2_walk_settle), nominal start, T0 seeds 0-15, scene T0-dev-((s mod 6)+1), paired by (scene, seed) with R-080 (v2_walk) as reference. Eligibility: all 16 walks XY<=3 cm AND yaw<10 deg; lower max XY wins; tie (<0.1 cm) -> lower median XY; then A. Neither eligible -> H-016 REFUTED, stage 2 not run.
+DISCLOSURE (must precede any screen run): smoke at varied seed 16 (single episode, no pre-registered verdict): A ended 1.85 deg yaw, final XY ~0.7 cm lateral; B ended 37.3 deg yaw because its large w_xy_quad=2e4 term overrides w_heading=160. H-016 predicted B would be picked (max yaw<7 deg); the smoke already contradicts the yaw prediction for B. Consequences: (1) B is likely INELIGIBLE under the yaw<10 rule, so the screen probably reduces to A passing/failing; it is still run in full because the rule is pre-registered and one episode at a varied start is not nominal-start evidence; (2) seed 16 was seen in smoke, so it is no longer blind in stage 2 (only the smoke's seed/arm, not a stage-2 verdict; stage 2 remains out-of-sample for 23 of 24 poses and seed 16 is flagged); (3) the smoke is NOT a selection input and the selection rule is unchanged. No gains/terms change (freeze).
+Decision value: picks A or B on the same nominal poses as R-080 and tests whether B's yaw failure is nominal or only varied-start. Gate for 84 stage-2 episodes.
+Stage 2 (conditional, filed as the next experiment after stage 1 result): winner on seeds 16-39 (T0-dev-((s mod 6)+1)) + T1-dev-01/02 x seeds {16,23} = 28 pairs; control v2_walk (unchanged) and fresh v0, same 28 pairs, same commit = 84 eps, one run_sim_batch per method. Total 116.. Cost: Stage 1: 32 eps, ~8-13 s each at max_workers=1 (pre-registered) = ~5-7 min wall. Full design 116 eps ~20-25 min. Budget 1005 left, not binding.. Follow H-016's pre-registered two-stage design. The nominal screen of A vs B (32 eps) is the only stage whose selection rule and decision rule are already frozen. Stage 2 (84 eps: winner, v2_walk, v0 on the same 28 pairs) is then run on the winner only. Straight-to-varied (X-047, 112 eps) would need an unfiled amendment, spends 28 eps on B, whose smoke yaw of 37.3 deg already looks ineligible, and uses up the varied seeds. Budget is not a factor (1005 eps left), and no design was shrunk: the full 116 eps are retained. The B smoke-yaw and seed-16 disclosures are in X-046 and precede any screen run.
+- **X-047** [rejected] tests H-016 with v2_walk_xy + v2_walk_settle + v2_walk + v0 (straight to varied starts, no screen) on 8 scenes, 112 episodes. Expected learning: Skip the nominal screen: run both candidates, unchanged v2_walk and v0 on the 28 varied pairs (seeds 16-39 T0 + T1-dev-01/02 x {16,23}), 4 batches x 28 = 112 eps. Learns the head-to-head on the out-of-sample poses directly, but it departs from H-016's pre-registered selection rule (stage-2 decision rule is defined only for the stage-1 winner), spends 28 eps on a candidate (B) whose smoke yaw (37.3 deg) already looks ineligible, and uses up the varied seeds on both candidates, so the varied set is no longer clean for a later confirmation. It cannot show whether A/B fix the original nominal s6/s4 tail the hypothesis was filed for. Would change the decision only if both candidates fail varied starts, which stage 1 + 2 would also reveal at lower risk.. Cost: 112 eps, ~8-13 s each at max_workers=1 = ~15-25 min wall. Not budget-limited (1005 left).. 
+- **X-048** [selected] tests  with v2_walk vs fresh v0 (matched pairs, one run_sim_batch per method) on 12 scenes, 96 episodes. Expected learning: Clears or fails rung 2 on T1 (D-011 gap, only 4/4). 48 pairs, scene=k%12+1, seeds 100..147 all distinct and unused, since the walk depends on the seed and not the scene (D-008), so there are 48 distinct walks. Wilson lower bound if all succeed 0.926. It tolerates 3 failures (45/48 gives 0.83) and still clears 0.8. Paired v0 comparison shows whether any loss is walk-caused. It changes whether v2_walk can go into a combined method on T1.. Cost: 96 episodes (9.9% of 973). The Sumo arm should run with max_workers=1 (D-008), roughly 45-90 min wall; the v0 arm takes minutes. Leaves 877.. Runnable now on b42df27 with no code change. It closes the only open rung-2 gap (T1 4/4). 48 distinct-seed pairs tolerate 3 failures and still clear 0.8, while the 24-pair probe (X-050) fails the bound on a single miss and would shrink the design.
+- **X-049** [rejected] tests  with NEW v6_combo_a (plan_order=support_sort, perceive=vlm prompt v1, build=sumo_walk_then_scripted_weld, v2_walk sumo block) vs fresh v0 on 6 scenes, 96 episodes. Expected learning: First combined rung 1+2+5 test on T0. 48 pairs with distinct seeds. Shows whether the rungs compose, or whether the VLM and walk errors add up (rung 5 already has its own arm bias margin, v2_walk has 3.5 cm XY drift risk). A pass means the combined T0 base is usable. A failure is hard to attribute to one rung, so telemetry per stage (perceive, order, walk end pose) must be logged. D-011 said to combine after the XY fix was tested. H-016 is refuted at stage 1 pending review, so the fix did not work, and the drift risk is carried knowingly.. Cost: 96 episodes plus 48 fresh VLM calls. Sumo serial with max_workers=1, roughly 1-2 h wall. Leaves 877 alone, 781 if run with the T1 test.. 
+- **X-050** [rejected] tests  with v2_walk vs fresh v0, cheap probe on 12 scenes, 48 episodes. Expected learning: 24 pairs. All-success lower bound 0.862, but one failure (23/24) gives 0.79 and misses 0.8, so it cannot tolerate any miss. Same question as the full test with less power. Rejected as a shrunken design.. Cost: 48 episodes, 30-45 min.. 
+- **X-051** [selected] tests H-019 with v47_vlm_anchor (40 ep: 16 confirmatory pairs + T1-dev-01..12 x seeds 0-1 =24) vs fresh v0 (16 ep on the 16 confirmatory pairs); seeds 0-1; frozen commit 319a838; one run_sim_batch per arm with pairs, only first batch per arm counts; episode cap 56 total (runner guard b42df27: v47 40, v0 16) on 20 scenes, 56 episodes. Expected learning: Exactly as pre-registered in H-019 and its dated notes (closed set S1). Decides SUPPORTED / PARTIAL / REFUTED / MECHANISM REFUTED via thresholds 1-5. Anchored vs recentred counterfactual (y_recentred) on 7 large-offset scenes shows whether the common-mode error e=-c0 is removed. T1 non-regression 24 episodes. Fresh v0 gives matched reference and exact McNemar.. Cost: 56 episodes (about 56 VLM calls), roughly 1-3 min wall on 8 workers per arm; leaves 821 of the 877 remaining episodes. Gate 0 is offline, 0 episodes.. X-051 is the design pre-registered in H-019 and its dated notes. It has 40 v47 episodes (16 confirmatory plus 24 T1) and 16 fresh v0 episodes, 56 in total. It is the only option that can evaluate every threshold, including T1 non-regression and the matched v0 reference. Cap: runner guard b42df27 at 40 for v47 and 16 for v0, so exactly 56 are allowed. X-052 (v47 only, 16 episodes) is rejected. It saves 40 episodes, but it drops T1 and the v0 control, so thresholds 2 and 5 cannot be decided. Under R4 it would also use up the one primary batch for v47, which leaves no verdict. 821 episodes remain after the run.
+- **X-052** [rejected] tests H-019 with v47_vlm_anchor only, 16 confirmatory episodes (8 scenes x seeds 0-1), no T1 episodes, no fresh v0; frozen commit 319a838 on 8 scenes, 16 episodes. Expected learning: Cheap probe of the anchoring mechanism (per-scene mean e, y_recentred vs y_anchored) and the 16-episode success tally. It cannot test T1 non-regression (a SUPPORTED and a REFUTED clause) and has no matched v0 control, so thresholds 2 and 5 cannot be evaluated.. Cost: 16 episodes; about 1 min wall.. 
+- **X-053** [selected] tests H-016 with X-046 stage-1 re-screen (RS-021 rejected B as untested-as-filed). v2_walk_xy (A) and fixed v2_walk_settle (B: linear w_position=160 PLUS w_xy_quad=2e4, w_base_vel=50, as filed in H-016), each on the same 16 T0 pairs: scene T0-dev-((s mod 6)+1), seeds 0-15, nominal start; one run_sim_batch per arm; max_workers=1; frozen commit 319a838; episode cap 32 (16 per arm). on 6 scenes, 32 episodes. Expected learning: H-016 selection and stage-2 rules unchanged. Eligible only if all 16 walks have XY <= 3 cm and yaw < 10 deg; lower max XY wins; tie (<0.1 cm) lower median XY; then A. If neither is eligible, H-016 is refuted at stage 1. A (R-089) already failed on s1 yaw 11.14 deg, but is rerun so both arms share one commit. This settles whether the fixed B is eligible, which RS-021 left untested. If an arm is eligible, stage 2 is a separate experiment filed later.. Cost: 32 episodes at about 8-13 s each at max_workers=1, so about 5-7 min wall. About 877 episodes left in budget, so not binding. Counts separately from X-046's earlier 32.. X-053 reruns both arms (A and fixed B) on the same 16 T0 pairs at the single frozen commit 319a838, so H-016's stage-1 selection rule, which compares max and median XY, stays valid under matched arms. It costs 32 episodes, and 877 are left. X-054 (rerun B alone, 16 episodes) is rejected. It would leave A (R-089) on a different commit from B, which breaks the matched-arms rule. The 16 episodes saved are not worth losing a valid comparison. Selection and stage-2 rules are unchanged, and stage 2 is a separate experiment filed later if an arm is eligible.
+- **X-054** [rejected] tests H-016 with Rerun B alone: fixed v2_walk_settle on the same 16 T0 pairs, seeds 0-15, max_workers=1, with A taken from R-089 on 6 scenes, 16 episodes. Expected learning: Tests only whether the fixed B is eligible. Saves 16 episodes. A would stay on its earlier commit while B runs at 319a838, so the screen compares arms across commits.. Cost: 16 episodes, about 3 min wall.. 
+- **X-055** [rejected] tests H-020 with H-020 BRANCH A (fixed by D-016): v6_combo (v47_vlm_anchor perceive + support_sort + v2_walk sumo + closed_loop_weld_place) vs FRESH v0, matched pairs, one run_sim_batch per arm with pairs. T0: 48 pairs, pair k=(T0-dev-{(k%6)+1:02d}, seed 400+k), k=0..47. T1: 48 pairs, pair k=(T1-dev-{(k%12)+1:02d}, seed 500+k), k=0..47. 96 pairs/arm, 192 episodes. Frozen commit 2235bf7 (lab-v1, validated); seed gate E-016 PASS. Sumo arm max_workers=1. Pass rule per H-020: >=44/48 per tier (Wilson LB>=0.8); thresholds/void rules V1-V3/R4 as in H-020. Runner guard caps: v6_combo 96 / v0 96. on 18 scenes, 192 episodes. Expected learning: Decides H-020: SUPPORTED (both tiers >=44/48 and support_valid_true everywhere) clears rungs 1+2+5 combined on T0 and T1; 39-43 = PARTIAL with attribution naming the next blocker (walk reopens D-015); <=38 or any order failure = REFUTED. Fresh matched v0 gives composition-penalty/McNemar per tier. Only design that can evaluate every H-020 threshold, including T1 where v47's closed-loop place matters and v47 has never run on T0. Note: pairing (scene=k%6 / k%12, seed 400+k / 500+k) differs from H-020's text (scene blocks of 8 / 4 with the same seed ranges); same seed set and scene counts (8 per T0 scene, 4 per T1 scene), only the scene-seed assignment differs, so the PI/designer should confirm via dated note before freeze.. Cost: 192 episodes (789 -> 597). Sumo arm serial: ~8-13 s/episode so about 15-25 min for 96; v0 arm minutes; 96 fresh VLM calls.. X-055 is the full H-020 Branch A design fixed by D-016. It covers 48 T0 and 48 T1 pairs, v6_combo vs fresh v0, on frozen commit 2235bf7, and can evaluate every threshold. It costs 192 episodes, leaving 597 of 789. X-056 (T0 only, 96 episodes) is rejected. It gives no T1 verdict, and Branch A cannot be SUPPORTED without T1. X-049 is superseded and rejected. It is the old 96-episode T0-only design. It has no hypothesis, uses the v5_vlm perceive block and scripted_weld, and has a different method (v6_combo_a). It is not the pre-registered Branch A.
+- **X-056** [rejected] tests H-020 with T0 only: v6_combo vs fresh v0, 48 pairs, scene T0-dev-{(k%6)+1:02d}, seed 400+k; frozen commit 2235bf7; caps 48/48. on 6 scenes, 96 episodes. Expected learning: Cheaper (saves 96 episodes) and tests walk+VLM composition on T0, but gives no T1 verdict, and T1 is where v47's closed-loop place is required and where H-020 needs >=44/48. Branch A requires both tiers, so it cannot yield SUPPORTED. A later T1 batch would need a separate X and a new commit/fingerprint, splitting the matched-arm evidence.. Cost: 96 episodes (789 -> 693), ~15-25 min wall.. 
+- **X-057** [rejected] tests H-020 with v0 ONLY (96 episodes) on the new frozen commit, same pairs as R-097 (T0 seeds 400-447, T1 seeds 500-547), paired post hoc with existing R-097 (v6_combo @2235bf7). on 18 scenes, 96 episodes. Expected learning: Would give a cheap v0 comparator for R-097. But R-097 is exploratory (outcome seen) and its fingerprint differs from any new-commit batch, so V1 voids the pair and R4 forbids pooling. No H-020 verdict possible.. Cost: 96 episodes (693 -> 597); v0 arm minutes.. 
+- **X-058** [selected] tests H-020 with H-020 CONFIRMATORY, Branch A: v6_combo vs FRESH v0, both arms fresh on the NEW frozen commit (hash to be reported by the engineer; contains the runner cap fix 76cc1a7 and the C3/C4 telemetry and prompt pinning). T0: T0-dev-01..06 x seeds 1400-1447 in scene blocks of 8 (dev-01: 1400-1407, dev-02: 1408-1415, ...). T1: T1-dev-01..12 x seeds 1500-1547 in blocks of 4 (dev-01: 1500-1503, dev-02: 1504-1507, ...). 96 pairs per arm, 192 episodes. Runner caps v6_combo 96 / v0 96, derived from this record (not hard-coded). Sumo arm max_workers=1. Void rules V1-V4 (V2 counts n/a_mismatch as present; missing prompt_sha256 = missing telemetry). Pass rule >= 44/48 per tier (Wilson LB >= 0.8). Thresholds, C1-C2 order classification, R1, R4 per H-020 dated notes. Seed gate E-017 (analyst re-check that 1400-1547 unused). R-097/X-055 is exploratory only and never pooled. on 18 scenes, 192 episodes. Expected learning: Only design that can decide H-020: SUPPORTED (both tiers >= 44/48, no order-class episode) clears rungs 1+2+5 on T0 and T1; 39-43 = PARTIAL with attribution naming the next blocker; <=38 or any order-class episode = REFUTED. Fresh v0 gives composition-penalty / McNemar per tier.. Cost: 192 episodes (693 -> 501). Sumo arm serial ~8-13 s/episode, about 15-25 min; v0 arm minutes; 96 fresh VLM calls. Smoke episodes (if the PI allows) excluded from analysis.. X-058 is the H-020 confirmatory test, with both arms fresh on the new frozen commit, 192 episodes. It follows H-020's dated notes exactly. X-055 is REJECTED/closed with this deviation note: "X-055 INCOMPLETE. Its v6_combo arm R-097 ran at 2235bf7. The v0 arm could not run at 2235bf7: a runner arm-cap bug capped v0 at 16 and rejected the call before any episode, and there was no valid call-argument workaround. The fix (76cc1a7, pipeline/runner/vlm_measure/telemetry) changes the fingerprint, so pairing R-097 with a v0 at the new commit would mix commits and is forbidden. R-097 is EXPLORATORY only (per the H-020 dated notes). No X-055 v0 arm will ever run." X-057 is rejected. It is a v0-only arm paired post hoc with R-097. It is cheaper at 96 episodes, but V1 voids it (different fingerprints), R4 forbids pooling the exploratory batch, and it can yield no verdict.
+- **X-059** [rejected] tests H-020 with CANDIDATE (a) rung 2 on T2/T3: v2_walk vs FRESH v0, frozen 76cc1a7. 48 pairs per tier, 4 seeds per scene on 12 scenes per tier. T2 scenes in order j=0..11: 01,02,03,06,11,12,19,22,24,25,26,28; seeds 2000+4j..2003+4j (2000-2047). T3 scenes j=0..11: 01,02,03,05,13,19,21,23,40,42,43,44; seeds 2100+4j..2103+4j (2100-2147). Off-grid confirmatory set (T2 24/25/26/28, T3 40/42/43/44) plus older scenes, with all structure types covered. Sumo arm max_workers=1; v0 arm normal workers. Pass rule: >=44/48 per tier (Wilson LB >=0.8). Seeds were never used on T2/T3 (record shows only seeds 0,1 there; 1400-1547 only on T0/T1); the analyst must re-run the seed gate before freeze. Short pre-registration filed first, per the D-011 ladder rule. on 24 scenes, 192 episodes. Expected learning: Clears or fails rung 2 on T2/T3, using the D-011 rule. If both tiers have >=44/48, the walk rung is cleared on all four tiers. If not, attribution says whether the walk or the weld failed, and whether the D-015 drift now matters on multi-block scenes. This decides whether v6_combo should be run on T2/T3 at all.. Cost: 192 episodes (501 -> 309). The Sumo arm (96) is serial at roughly 15-40 s per episode, about 0.5-1 h. The v0 arm takes minutes.. 
+- **X-060** [rejected] tests H-020 with CANDIDATE (b) combined ladder climb on T2/T3: v6_combo vs FRESH v0, frozen 76cc1a7. Same 48 pairs per tier as candidate (a): T2 seeds 2000-2047, T3 seeds 2100-2147, same scene lists. Sumo arm max_workers=1, with 48 fresh VLM calls per tier. Pass rule: >=44/48 per tier. Telemetry T-perc/T-order/T-walk/T-place/T-hash, void rules V1-V4 and the C1-C2 order classification carried over from H-020. Needs a NEW hypothesis filed by method_designer BEFORE the freeze (an H-020 extension to T2/T3, with branch rules). It should say that H-020's T0/T1 review is still pending and that this test is conditional on it. on 24 scenes, 192 episodes. Expected learning: Tests the full ladder climb (picture in, planned order, walking, closed-loop place) on the hardest tiers. This is the headline result. A pass supports the claim that the combination holds on T2/T3. A fail gives an attribution (perception_structure on 6-block pyramids and staircases, order, walk drift, or placement). It does not separate walk from perception from order unless candidate (a) is also known.. Cost: 192 episodes (501 -> 309). The Sumo arm is serial at an estimated 30-60 s per episode on 3-6 block scenes (19 s on T0/T1), about 1-1.6 h. The v0 arm takes minutes.. 
+- **X-061** [selected] tests H-020 with CANDIDATE (c) JOINT three-arm test on ONE frozen commit 76cc1a7 and ONE experiment id: v0 (fresh), v2_walk and v6_combo, all on the same 96 pairs (48 T2 seeds 2000-2047, 48 T3 seeds 2100-2147, same scenes as (a)/(b)). One v0 batch serves as the matched control for both hypotheses. Two pre-registered hypotheses: (a) rung 2 on T2/T3 (short, D-011 rule) and (b) v6_combo on T2/T3 (new, from method_designer). Each hypothesis gets its own verdict against the same v0 batch. Run order: v0, then v2_walk, then v6_combo, with no Sumo overlap (both Sumo arms at max_workers=1, serial; v0 can run while idle). Runner caps for the joint X: v0 96 / v2_walk 96 / v6_combo 96, derived from the X record. One primary batch per method (R4). on 24 scenes, 288 episodes. Expected learning: The same as (a) plus (b), with one control batch instead of two (saves 96 episodes). It is identical in power per hypothesis. Because v2_walk and v6_combo see identical pairs, a combo failure can be compared with the walk-only result on the same pair: if v2_walk passes and v6_combo fails, the cause is perception or order, not the walk. A single run gives the cleanest attribution for the whole ladder.. Cost: 288 episodes (501 -> 213, a 42% margin). Sumo wall time is about 1.5-2.6 h in total, serial. The v0 arm takes minutes.. X-061 runs v0, v2_walk and v6_combo on the same 96 T2/T3 pairs at frozen 76cc1a7. It gives each of (a) and (b) a full 48-per-tier test against one shared fresh v0. That costs 288 episodes, against 384 for running (a) and (b) separately (X-059 + X-060), which leaves 213 of 501 as margin. Identical pairs also let a combo failure be compared with the walk-only result on the same pair. X-062 is a shrunken screen that can't clear anything, so it is rejected. Sumo arms run serially at max_workers=1. Both pre-registrations must be filed before the freeze, and the v6_combo arm can be dropped if the H-020 review fails.
+- **X-062** [rejected] tests H-020 with CANDIDATE (d) cheap probe: v6_combo and v2_walk vs v0 on the 8 off-grid scenes only, 6 seeds each (T2 24/25/26/28 and T3 40/42/43/44, seeds 2000+), 24 pairs per tier-pair. This is a screen with no verdict. on 8 scenes, 144 episodes. Expected learning: It gives an early failure signal but is too small to clear anything: at n=24 per tier a Wilson LB >=0.8 needs at most 1 failure. This is a shrunken design, which is not allowed under the no-shrink rule. It would also use seeds and scenes that a later full test needs to keep fresh, and the full test would then have to run anyway.. Cost: 144 episodes, with no verdict at the end. This is a net loss against (c).. 
+- **X-063** [selected] tests H-022 with v6_combo vs fresh v0, both at frozen commit 15686c1 (max_workers 6 committed in both yamls). Seeds: T2 4000-4047, T3 4100-4147, 4 consecutive per scene in list order (96 identical pairs). Arm caps 96 + 96. Seed gate E-021 PASS. One primary batch per arm (R4), run sequentially, no commits during the window. Pass >= 44/48 per tier; V1 (full fingerprint id incl. git_head), V2-V4; classifier C1-C2. on 24 scenes, 192 episodes. Expected learning: Confirmatory verdict on H-022 (SUPPORTED if both tiers >= 44/48, no 'order' class; PARTIAL 39-43; REFUTED <= 38 or any order). Decides whether the combined ladder 1+2+5 is cleared on T2/T3 or the successor targets the dominant failure class. Matched fresh v0 gives a valid shared control and V1-clean fingerprint.. Cost: 192 episodes (budget 213 left -> 21 remain). Wall time roughly 10-25 min at max_workers 6 (Sumo ~2.5x slower than real time); v6_combo arm dominates.. X-063 is the only design H-022's ruling allows: v6_combo and a fresh v0 on one frozen commit (15686c1), with fresh seeds 4000-4047 and 4100-4147 and identical pairs. It costs 192 of the 213 episodes left. X-064 reuses the VOID R-102, so it mixes commits, which V1 and R4 forbid. It also has no identical pairs, so it can't give a confirmatory verdict.
+- **X-064** [rejected] tests H-022 with Reuse R-102 (v6_combo, git_head bd304ad, seeds 2000-series) and pair it with a NEW v0 arm on the new commit 15686c1 (96 episodes only). on 24 scenes, 96 episodes. Expected learning: Would save 96 episodes, but the verdict is not interpretable: mixed fingerprints and different seeds and no identical pairs.. Cost: 96 episodes, about half the wall time.. 
 
 ## Hypotheses (agent-generated, labeled by author)
 
@@ -1039,7 +1876,7 @@ REFUTED if dev-02 or dev-05 still fails, or if any scene that passes in v5_vlm f
 No-regression check: T0, T2 and T3 should be unchanged or improved against v5_vlm (the VLM spec equals the oracle on T0/T3). Any drop refutes.
 Caveat: the effective n is 6 scenes. Even 6/6 gives a Wilson LB of about 0.61, so this tests the mechanism on dev scenes, not a population rate.; evidence: RS-002, RS-001, H-006, H-003, X-014)
 - **H-009** [refuted] by method_designer: [X-019 | rung 2 | intended as pre-registration: a query_record(kind=run, contains="X-019") just before filing returned no runs. Pre-registration status must be confirmed by comparing this hypothesis's created timestamp with the earliest X-019 run timestamp.] v2_walk (v2 perception/approach stage) keeps v0's placement quality. On T0-dev-01..06, seeds 0-3, with default physics (24 episodes), compared pairwise against v0 run R-003 on the same scene and seed, v2_walk should clear: 24/24 success with no material increase in placement error. (predicted: The planner's decision rule, applied to the 24 paired episodes (v2_walk vs R-003, same scene and seed). Rules are checked in this order: NOT CLEARED, then AT RISK, then CLEARED. CLEARED: 24/24 success, AND median paired block-position error increase vs R-003 <= 0.3 cm, AND max block error <= 2.7 cm. AT RISK: no failure and no block > 3 cm, but median paired error increase is 0.3-0.8 cm, OR any approach miss > 1 cm. NOT CLEARED: any failure, OR any block error > 3 cm. Prediction: CLEARED.; evidence: R-003)
-- **H-010** [open] by method_designer: Successor to H-004 (refuted by RS-005). Rung 3, new config v3_grasp_lift (methods/v3_grasp_lift.yaml) = v3_grasp unchanged except for the post-release motion: open the fingers in place, lift the hand straight up (world +z) by >= 0.12 m, and only then retreat. No oracle place correction, default physics (no elliptic cone or noslip). Idealizations still in use: oracle_structure_spec, oracle_build_order, oracle_block_pose, fixed_base, scripted_arm. The existing v3_grasp_stack is rejected as the vehicle: its release_clear_vector [-0.08,0,0.03] gives only 3 cm of lift on a block about 10 cm tall, so the jaw still sweeps through the block, and it adds an oracle place correction that would confound the test. Mechanism (from RS-005): 41/48 T1 failures and 5 T0 failures are post-release disturbance, where the open jaw moves sideways along the tool axis before it clears the block and drags or knocks it 20-40 cm. A vertical lift that clears the block top before any lateral motion removes that contact. Alternatives rejected: sampling-based MPC for the release (CPU and 24 h budget, and the defect is retreat geometry that a scripted waypoint fixes), learned release (no training allowed), physics changes (they target the transit drops, a separate defect; see scope). SCOPE: this change does NOT address the T0-dev-02 brick drops in transit (7 of RS-005's T0 failures). Those are a grasp/friction defect. The candidate fix is a separate elliptic-cone + noslip physics variant, and X-016 is still pending analysis. They are expected to persist here and cap T0 at about 41/48. (predicted: Experiment: v3_grasp_lift, seeds 0-7, T0+T1 dev, n=48 per tier, the same design as X-008. Matched control is RS-005 (v3_grasp: T0 36/48 = 0.75, T1 0/48). Report a Wilson 95% lower bound for each tier and note that effective n = 6 scenes per tier.
+- **H-010** [refuted] by method_designer: Successor to H-004 (refuted by RS-005). Rung 3, new config v3_grasp_lift (methods/v3_grasp_lift.yaml) = v3_grasp unchanged except for the post-release motion: open the fingers in place, lift the hand straight up (world +z) by >= 0.12 m, and only then retreat. No oracle place correction, default physics (no elliptic cone or noslip). Idealizations still in use: oracle_structure_spec, oracle_build_order, oracle_block_pose, fixed_base, scripted_arm. The existing v3_grasp_stack is rejected as the vehicle: its release_clear_vector [-0.08,0,0.03] gives only 3 cm of lift on a block about 10 cm tall, so the jaw still sweeps through the block, and it adds an oracle place correction that would confound the test. Mechanism (from RS-005): 41/48 T1 failures and 5 T0 failures are post-release disturbance, where the open jaw moves sideways along the tool axis before it clears the block and drags or knocks it 20-40 cm. A vertical lift that clears the block top before any lateral motion removes that contact. Alternatives rejected: sampling-based MPC for the release (CPU and 24 h budget, and the defect is retreat geometry that a scripted waypoint fixes), learned release (no training allowed), physics changes (they target the transit drops, a separate defect; see scope). SCOPE: this change does NOT address the T0-dev-02 brick drops in transit (7 of RS-005's T0 failures). Those are a grasp/friction defect. The candidate fix is a separate elliptic-cone + noslip physics variant, and X-016 is still pending analysis. They are expected to persist here and cap T0 at about 41/48. (predicted: Experiment: v3_grasp_lift, seeds 0-7, T0+T1 dev, n=48 per tier, the same design as X-008. Matched control is RS-005 (v3_grasp: T0 36/48 = 0.75, T1 0/48). Report a Wilson 95% lower bound for each tier and note that effective n = 6 scenes per tier.
 T1: success >= 0.8 (>= 39/48); its Wilson lower bound at 39/48 is about 0.67. SUPPORTED if >= 39/48. REFUTED if < 39/48.
 T0: success >= 0.8 (>= 39/48), with the T0-dev-02 transit drops still counted as failures. Expected about 41/48 (0.85): the 5 drag failures are fixed and the about 7 drops remain. SUPPORTED if >= 39/48. REFUTED if < 39/48. If T0 is refuted only because T0-dev-02 drops exceed 7 while no other T0 failures remain, record that as drop variance outside this change's scope, not as a release-mechanism failure.
 Mechanism check (both tiers): post-release block displacement, measured from the per-phase displacement logs over open + lift + retreat, must be < 1 cm on >= 90% of episodes. The denominator is episodes where the block reached release without a pre-release drop. REFUTED on mechanism if < 90% of those episodes are under 1 cm, or if most remaining T1 failures still show post-release displacement > 1 cm (the lift does not clear the jaw). If success thresholds pass but the mechanism check fails, the success gain is not attributed to the lift.
@@ -1050,7 +1887,7 @@ Not addressed: the T0-dev-02 brick transit drops. They are predicted unchanged (
 3. AT RISK (no failures but): worst block 2.7-3.0 cm, median paired error > +0.3 cm vs R-003, hand-off move > 0.5 cm, median post-hand-off drift > 0.5 cm, or any 600 s timeout.
 4. CLEARED: 24/24, worst <= 2.7 cm, median paired change <= +0.3 cm.
 5. IMPROVES (only if CLEARED): median error down >= 0.5 cm, >= 19/24 pairs better, >= 5/6 scenes better.; evidence: RS-004, R-003)
-- **H-012** [open] by method_designer: [Rung 2 | pre-registered treatment, reused historical control | follows H-009, which X-019 refuted: 20/24, NOT CLEARED] Filed BEFORE any batch of the fixed method. Check this by comparing this record's timestamp with the earliest run of the post-fix v2_walk. Change: v2_walk with w_heading = 160 (was 8) in lab/sumo_tasks/spot_walk_approach.py. Nothing else in the method changes. Mechanism: in X-019 (R-029..R-031), all 4 failures on T0 were 'unreachable'. In each of them the walked XY was within 0.2-1.6 cm of the target, but the yaw error was 77-179 deg. The walk got to the right spot facing the wrong way, because the heading term was too weak against the position term. Raising w_heading 20x should close the yaw error without hurting XY. Smoke evidence after the fix (these are artifacts, not lab batch records): T0-dev-02 s1 and s2 succeeded with 2.4 and 2.3 deg walked yaw, and T1-dev-01 s0 succeeded. CAVEAT: T0-dev-02 s1 and s2 were used to tune w_heading, so they are in-sample. Design: v2_walk(w_heading=160) on T0-dev-01..06, seeds 0-3, default physics = 24 episodes, paired by (scene, seed) with the v0 control R-003 restricted to seeds 0-3. R-003 is a reused historical control and predates this hypothesis. Only the treatment arm is pre-registered. Freeze: no further change to w_heading or other walk gains after filing. Any change voids this test and needs a successor hypothesis. Idealizations still in use: oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge. (predicted: PRIMARY (T0, 24 eps): >= 22/24 success, AND every episode's walked yaw error < 10 deg, successes and failures alike. Out-of-sample sub-claim, excluding the tuning episodes T0-dev-02 s1 and s2: >= 20/22, reported separately. SECONDARY (diagnostic, does not refute alone): walked XY error stays <= 2 cm in every episode (X-019 range: 0.2-1.6 cm). Median paired block-position error change vs R-003 <= +0.3 cm (H-009's CLEARED margin).
+- **H-012** [refuted] by method_designer: [Rung 2 | pre-registered treatment, reused historical control | follows H-009, which X-019 refuted: 20/24, NOT CLEARED] Filed BEFORE any batch of the fixed method. Check this by comparing this record's timestamp with the earliest run of the post-fix v2_walk. Change: v2_walk with w_heading = 160 (was 8) in lab/sumo_tasks/spot_walk_approach.py. Nothing else in the method changes. Mechanism: in X-019 (R-029..R-031), all 4 failures on T0 were 'unreachable'. In each of them the walked XY was within 0.2-1.6 cm of the target, but the yaw error was 77-179 deg. The walk got to the right spot facing the wrong way, because the heading term was too weak against the position term. Raising w_heading 20x should close the yaw error without hurting XY. Smoke evidence after the fix (these are artifacts, not lab batch records): T0-dev-02 s1 and s2 succeeded with 2.4 and 2.3 deg walked yaw, and T1-dev-01 s0 succeeded. CAVEAT: T0-dev-02 s1 and s2 were used to tune w_heading, so they are in-sample. Design: v2_walk(w_heading=160) on T0-dev-01..06, seeds 0-3, default physics = 24 episodes, paired by (scene, seed) with the v0 control R-003 restricted to seeds 0-3. R-003 is a reused historical control and predates this hypothesis. Only the treatment arm is pre-registered. Freeze: no further change to w_heading or other walk gains after filing. Any change voids this test and needs a successor hypothesis. Idealizations still in use: oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge. (predicted: PRIMARY (T0, 24 eps): >= 22/24 success, AND every episode's walked yaw error < 10 deg, successes and failures alike. Out-of-sample sub-claim, excluding the tuning episodes T0-dev-02 s1 and s2: >= 20/22, reported separately. SECONDARY (diagnostic, does not refute alone): walked XY error stays <= 2 cm in every episode (X-019 range: 0.2-1.6 cm). Median paired block-position error change vs R-003 <= +0.3 cm (H-009's CLEARED margin).
 REFUTED if any of these holds: (a) <= 21/24 success; (b) any episode with walked yaw error >= 10 deg; (c) any 'unreachable' failure where yaw error >= 10 deg, meaning the original mode persists; (d) the out-of-sample subset is <= 19/22, even if the total is >= 22/24. If (a) holds and every failure has yaw < 10 deg, the heading fix worked but some other defect is limiting. Record that as a new failure mode under a successor hypothesis, not as support. If walked XY degrades to > 3 cm in any episode, that is a trade-off of the heading gain against position. Record it as a refutation of the 'no side effect' mechanism, even if success holds.
 OPTIONAL T1 EXTENSION (run only if the primary is not refuted): same method on T1-dev-01..06, seeds 0-3 (24 eps), paired with the v0 T1 control R-005 (reused historical). Prediction: >= 22/24 success, all walked yaw < 10 deg, no failure with category 'unreachable'. Some extra failures from stacking are expected, but drift is bounded by the 3 cm tolerance. T1-dev-01 s0 was a post-fix smoke run but was not used for tuning, so it counts out-of-sample. Report it anyway. Refuted by <= 21/24 or any yaw >= 10 deg.; evidence: X-019, R-029, R-030, R-031, R-003, H-009)
 - **H-013** [open] by method_designer: [Rung 5 | agent hypothesis by method_designer | SUCCESSOR to H-008 (refuted by RS-012), and SUPERSEDES H-003 | filed BEFORE any run of v46_vlm_measure. A query_record(kind=run, contains="measure") just before filing was empty, and the newest run was R-046 (v2_walk). Confirm by comparing this record's created timestamp with the earliest v46_vlm_measure run.]
@@ -1073,7 +1910,7 @@ DECISION RULE, checked in order:
 4. SUPPORTED if off-grid >= 14/16, T1 >= 23/24, and every failing block has |e| <= 1.5 cm.
 5. 'BEATS v45' is claimed only if, among the 16 off-grid pairs, >= 6 discordant favor v46 and 0 favor v45 (exact McNemar p = 0.031). 'MATCHES v0' means off-grid >= v0 - 1 (>= 14/16), and is reported as statistically unresolved at n = 16.
 COST: 40 episodes primary. Optional add-on, run only if PARTIAL or SUPPORTED: seed 2 on the 8 off-grid scenes, treatment only (+8), reported descriptively. Total <= 48 episodes (cap 60), plus about 40 VLM calls (10-60 s each) and free eval_prompt calls for Gate 0.; evidence: RS-012, R-033, R-035, R-005, R-017, H-008, H-003, RS-010, H-006)
-- **H-014** [open] by method_designer: [Rung 2 | AMENDMENT of H-012 for X-035 | label: pre-registered treatment; partly reused historical control | filed BEFORE any X-035 run.] PRE-RUN CHECK: query_record(kind=run, contains="X-035") and query_record(kind=result, contains="X-035") both returned EMPTY immediately before filing. The newest run in the record is R-046 (X-032, created 1791082217.04). X-035 was selected at 1791082344.70. Wall clock: the shell is denied (read-only workspace), so the query time is bounded above by THIS record's created timestamp. Confirm pre-registration by checking that this timestamp is earlier than the earliest X-035 run.
+- **H-014** [refuted] by method_designer: [Rung 2 | AMENDMENT of H-012 for X-035 | label: pre-registered treatment; partly reused historical control | filed BEFORE any X-035 run.] PRE-RUN CHECK: query_record(kind=run, contains="X-035") and query_record(kind=result, contains="X-035") both returned EMPTY immediately before filing. The newest run in the record is R-046 (X-032, created 1791082217.04). X-035 was selected at 1791082344.70. Wall clock: the shell is denied (read-only workspace), so the query time is bounded above by THIS record's created timestamp. Confirm pre-registration by checking that this timestamp is earlier than the earliest X-035 run.
 WHAT IS AMENDED: only the design, thresholds and decision rule of H-012. The claim and mechanism are unchanged: w_heading 8 -> 160 closes the 77-179 deg yaw failures of X-019 without hurting XY. The FREEZE is unchanged: w_heading = 160, and no other walk gain changes after H-012 was filed. Any change voids the test. This supersedes H-012's 24-episode literal design (X-034, rejected) for the purpose of judging H-012.
 METHOD: methods/v2_walk.yaml unchanged (perceive=oracle, plan_order=oracle, build=sumo_walk_then_scripted_weld, Sumo spot_walk_approach, Relic, CEM 24 rollouts). w_heading=160 lives in lab/sumo_tasks/spot_walk_approach.py and must be at a CLEAN COMMIT. The current record shows 911b67d+dirty, which is not acceptable. Also required: deterministic Sumo and max_workers=1, dev scenes only. Idealizations still in use: oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge. Approaches rejected: MPC for heading costs ~600 s per episode and is not needed for a gain fix. Retuning is forbidden by the freeze. Training is not allowed.
 DESIGN (32 episodes):
@@ -1114,6 +1951,514 @@ REPORTING, all required:
 (iii) Paired block-error change vs v0, split into reused pairs (R-003/R-005, n = 8) and fresh pairs (n = 12). If the medians of the two splits disagree in sign by more than 0.3 cm, flag that reuse may be invalid. This is diagnostic only.
 (iv) Success with Wilson 95% CIs, while noting that effective n = 16 walks.
 SCOPE: the walk start/goal is a fixed nominal pose, so a pass shows heading robustness to seed only, not to the start pose (scene_designer follow-up). No retuning of any kind is permitted. Any change after filing needs a successor hypothesis.; evidence: H-012, X-035, X-019, RS-011, R-003, R-005, RS-004, R-026, R-027, R-044, R-045, R-046)
+- **H-015** [open] by method_designer: [Rung 5 | agent hypothesis by method_designer | DATED AMENDMENT to H-013, 2026-10-04 | filed BEFORE any rerun episode. Pre-check: query_record(kind=run) newest = R-079 (X-037, v0, created 1791085424). No run after X-037 exists. Confirm by comparing this record's created timestamp with the earliest rerun episode.]
+CONTEXT: D-010 voided X-037/RS-016 because the code fingerprint differed between its parts. Part A ran on 80d4b35 (ws 3f9b7a). Part B ran on ws e00db7, and R-078 (1c4abe0) and R-079 (aa5cc95) also differ in git_head. RS-016 (now void) also showed that per-block perceived y was not logged, and that T2-dev-16 (both seeds) failed through a deterministic 6-7 cm lateral mis-measurement of the white cube on a bridge, with T2-dev-18 also involving the white cube. The H-013 claim and mechanism are unchanged. Only the items below change.
+(A1) MASK GENERALISATION (robotics_engineer, being implemented in lab/stages/vlm_measure.py). The white cube has low saturation, so the saturated-colour mask treated it as background or merged it with the bridge. The new mask segments white or near-white blocks by a low-saturation, high-value threshold against the known render background. When a white cube supports a bridge brick or sits on one, the bridge-brick mask edge splits it from the cube, so the cube centroid is measured from its own pixels and not from the merged blob. Pixel-per-metre scale still comes from the known block widths in the same image. No scene.spec or sim state is read for y (this is still VOID clause 1). It is a perception-only change: build/placement code is unchanged from the frozen commit.
+(A2) LOGGED METRIC, pre-registered: every block in every v46 episode logs e = perceived y - true y (cm, signed), and the placement residual p = final y - perceived target y. Ground truth is used for scoring only, after perception. Report median |e| and max |e| per arm, plus per block on white-cube blocks.
+(A3) FROZEN COMMIT: one clean, committed tree, with an identical run_fingerprint.id (same git_head AND workspace_sha256) across ALL arms run in the rerun (v46 Part A, v46 Part B, v0 Part B). Commit the mask fix first, then freeze. VOID if any rerun run's fingerprint differs from the first, if the tree is dirty, or if any v46 episode lacks the cached/fresh flag, the VLM reading hash, or per-block e.
+(A4) DESIGN, identical to the 72-episode X-037 design: Part A, v46: T1-dev-01..12 seeds 0-1 (24 eps, CONFIRMATORY, absolute threshold, v0 reference R-005/R-017) plus old off-grid T2-dev-11..14 and T3-dev-13..16 seeds 0-1 (16 eps, EXPLORATORY). Part B: T2-dev-15..18 and T3-dev-17..20 seeds 0-1, v46 (16) vs a FRESH v0 (16) at the same frozen commit, paired by (scene, seed). Total 72. No add-on.
+(A5) CONTAMINATION DISCLOSURE: the mask fix targets a failure first seen on Part B scenes T2-dev-16/18. Part B is therefore no longer fully unseen. The verdict still uses all 16 Part B pairs as pre-registered, but the report MUST also give the sensitivity readout on the 12 Part B episodes excluding T2-dev-16/18 (descriptive, not a verdict). (predicted: THRESHOLDS UNCHANGED from H-013 as amended for X-037. Part B off-grid v46: predicted >= 14/16. SUPPORTED >= 14/16 (and every failing block |e| <= 1.5 cm). PARTIAL 11-13/16. REFUTED <= 10/16. T1 (Part A): predicted 24/24, REFUTED <= 22/24, SUPPORTED/PARTIAL require >= 23/24. Verdict is against v0 only. v45 comparison is exploratory. McNemar 'beats v0' is reported, not required.
+e-PREDICTIONS (pre-registered, now measurable): Part B median |e| <= 0.7 cm, max |e| <= 1.5 cm. White-cube blocks on T2-dev-16 and T2-dev-18: |e| <= 1.5 cm in both seeds (was 6-7 cm on T2-dev-16). Mechanism REFUTED (whatever the success rate) if Part B median |e| > 1.5 cm, or if any white-cube block has |e| > 3 cm. If success improves but Part B median |e| > 1.0 cm, the gain is attributed to placement, not perception. If failures persist with |e| <= 1.5 cm and |p| > 3 cm, they are attributed to placement (H-006), not perception.
+Exploratory readouts: old off-grid 16 eps (staircase b2 on T2-dev-11/T3-dev-14, e < 3 cm), and Part B without T2-dev-16/18 (12 eps).
+COST: 72 episodes of the 501 remaining (429 left after). About 56 VLM calls.; evidence: H-013, RS-016, R-078, R-079, R-005, R-017, R-035, R-033, H-006)
+- **H-016** [refuted] by method_designer: [Rung 2 | SUCCESSOR of H-012/H-014 (refuted by RS-017 on clause 2(e) only) | label: agent hypothesis by method_designer | FILED BEFORE ANY RUN | status: OPEN, untested]
+PRE-RUN CHECK: query_record(kind=run, contains="v2_walk_") returned only R-081, R-080 (X-040) and R-079. No v2_walk_xy or v2_walk_settle run exists, and neither config exists yet. Confirm pre-registration by checking that this record's created timestamp is earlier than the first run of either config.
+CLAIM: w_heading=160 fixed yaw (0/16 walks >= 10 deg, max 7.78). The remaining XY tail (s6 3.50 cm, s4 2.39 cm, against a pre-fix range of 0.2-1.6 cm) is an end-of-walk settling defect, not a heading/position trade-off. Reading of spot_walk_approach.py: the cost averages a linear ||xy-goal|| over the whole rollout, with no terminal or velocity term. CEM therefore has no extra incentive to stop exactly on the goal at t=4 s. At 3.5 cm the position cost (160*0.035=5.6) already dominates heading (160*qz^2=0.74 at 7.8 deg), so the miss is not heading winning the trade. A terminal XY settle term or phase should close it with heading FROZEN at 160.
+CANDIDATES (both keep every existing gain frozen: w_position=160, w_heading=160, w_controls=0.2, CEM 24, episode_length_s=4.0; only the listed additions change):
+A. methods/v2_walk_xy.yaml: terminal settle TERM inside the single walk. Add w_terminal_xy=400 on ||xy-goal|| over the last 25% of each rollout horizon, plus w_base_vel=10 on ||v_xy||^2, active only when ||xy-goal|| < 0.10 m. Cost: ~0 extra wall time.
+B. methods/v2_walk_settle.yaml: settle PHASE after the walk. The walk is unchanged (v2_walk at 1f465a4). Once the walk ends inside the 0.25 m tolerance, run a second Sumo phase of 2.0 s with: the same linear w_position=160 and w_heading=160, plus w_xy_quad=2e4*||xy-goal||^2 and w_base_vel=50*||v_xy||^2, with the commanded base speed clipped to 0.2 m/s. Cost: ~+5 s wall per episode.
+REJECTED: (i) raising w_position or lowering w_heading: this breaks the H-012 freeze and reopens the trade-off H-012 fixed. (ii) Lengthening the episode alone: it is diagnostic only and does not add any incentive to stop. (iii) Huber/quadratic position alone: the linear term already has a constant gradient, and the missing piece is terminal/velocity weighting. (iv) A scripted IK base nudge after the walk: it would bypass the whole-body policy, which reintroduces the rung-2 idealization. (v) RL: not allowed (no training, CPU only).
+DE-IDEALIZATION (new): every walk so far starts at the fixed nominal pose (start_x=-1.5, y=0, yaw=0). This test removes that idealization ('fixed_nominal_walk_start').
+WHAT robotics_engineer MUST BUILD (no code was edited by me):
+(1) Add start_y and start_yaw to SpotWalkApproachConfig and set reset_pose from them. Keep the nominal default at (-1.5, 0, 0).
+(2) Add a per-seed start-pose table, walk_starts/varied_v1, wired through the sumo stage. Seeds 0-15 = nominal. Seeds 16-39 = the full grid d in {0.90, 1.10, 1.35} m x bearing phi in {-30, -10, +10, +30} deg x start yaw psi in {-30, +30} deg, ordered lexicographically (d, phi, psi). Start = (goal_x - d*cos(phi), goal_y - d*sin(phi), psi). d is capped at the nominal 1.35 m so episode_length_s=4.0 stays frozen.
+(3) Candidate A terms (w_terminal_xy, terminal_frac=0.25, w_base_vel, vel_gate_m=0.10) in a task variant spot_walk_approach_xy.py. Do NOT change spot_walk_approach.py, so v2_walk stays the control.
+(4) Candidate B: a settle phase in the sumo_walk_then_scripted_weld build stage (settle_s=2.0, w_xy_quad, w_base_vel, max_base_speed=0.2), switched on by a config key.
+(5) Log, for every episode: final walked XY (cm), yaw (deg), final base planar speed at walk end (and at settle end for B), and the start pose actually used.
+Both configs = v2_walk plus the above. Stages: perceive=oracle, plan_order=oracle, build=sumo_walk_then_scripted_weld. Idealizations still in use: oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge.
+DESIGN, two stages. Same clean commit for all arms, max_workers=1, deterministic Sumo, default physics.
+STAGE 1 (screen, nominal start; IN-SAMPLE because s6/s4 motivated the change): A and B each on T0 seeds 0-15 with the H-014 mapping T0-dev-((s mod 6)+1). That is 32 eps; R-080 is the v2_walk reference. SELECTION RULE: a candidate is eligible only if all 16 walks have XY <= 3 cm and yaw < 10 deg. Pick the eligible candidate with the lower max XY; on a tie (|diff| < 0.1 cm), pick the lower median XY; on a further tie, pick A (cheaper). If neither is eligible, this hypothesis is REFUTED at stage 1 and stage 2 is not run.
+STAGE 2 (confirm, VARIED start; OUT-OF-SAMPLE): the selected candidate on seeds 16-39 (24 poses) on T0-dev-((s mod 6)+1), plus T1-dev-01/02 x seeds {16, 23} (4 eps, arm-phase + determinism duplicates). CONTROL on the same 28 (scene, seed) pairs: v2_walk (unchanged, w_heading=160) with the same start-pose table, plus fresh v0 at the same commit (28 eps) for paired block error. Total = 32 + 28 + 28 + 28 = 116 eps, about 116 * 8-13 s ≈ 20-25 min wall.
+DIAGNOSTIC pre-registered (does not decide): if the stage-1 v2_walk reference for s6 (R-080) shows final base planar speed > 5 cm/s at t=4 s, the 'unfinished approach' mechanism is supported. If not, B's phase is the better-motivated fix. (predicted: PREDICTIONS (method_designer, numbers):
+A (v2_walk_xy), nominal seeds 0-15: max XY <= 1.5 cm (s6 3.50 -> <= 1.5), median XY <= 0.8 cm, max yaw < 8 deg, median yaw <= 3.0 deg. Varied start: max XY <= 2.0 cm, max yaw < 8 deg.
+B (v2_walk_settle), nominal: max XY <= 1.0 cm, median XY <= 0.5 cm, max yaw < 7 deg, median yaw <= 2.5 deg. Varied start: max XY <= 1.5 cm, max yaw < 7 deg.
+Expected pick: B. Control v2_walk on varied starts: predicted >= 1 walk with XY > 3 cm, and max yaw rising to 8-10 deg because of the +/-30 deg start yaws. This shows the varied test has teeth.
+DECISION RULE for the SELECTED candidate on stage 2. Check in order VOID -> NOT CLEARED -> AT RISK -> CLEARED; the first rule that fires decides.
+1. VOID if any of these hold: the tree is dirty, or the treatment, v2_walk-control and v0 commits/fingerprints differ; w_position != 160, w_heading != 160, w_controls != 0.2, CEM rollouts != 24 or episode_length_s != 4.0; the candidate's added terms differ from the values filed here; max_workers != 1 or Sumo is not deterministic; any (scene, seed, start pose) deviates from walk_starts/varied_v1; walked XY, yaw, end speed or start pose is missing for any episode; DETERMINISM FAILS, i.e. the T1 duplicates of seeds 16 and 23 do not match their T0 walks within 1e-6 m and 1e-4 deg; the stage-1 selection rule was not followed.
+2. NOT CLEARED (REFUTES this hypothesis; a successor is required, not an edit) if any of these hold: (a) any walk has XY > 3 cm (24 varied T0 + 4 T1); (b) any walk has yaw >= 10 deg; (c) T0 varied success <= 21/24 (21/24 = 0.875 is the floor that keeps the Wilson lower bound near the 0.8 target); (d) any 'unreachable' failure or any fall; (e) any T1 failure caused by walk pose; (f) median paired block-position error change vs fresh v0 > +0.5 cm.
+3. AT RISK (none of 2 fires, but any of these do): any XY in (2, 3] cm; any yaw >= 7 deg; T0 varied success = 22/24 or 23/24; median paired block-error change in (+0.3, +0.5] cm; any 600 s timeout; or the candidate is not better than the v2_walk control on max XY over the same varied poses (i.e. the varied test did not separate them).
+4. CLEARED: 24/24 T0 varied, 4/4 T1, every XY <= 2 cm, every yaw < 7 deg, median paired block-error change <= +0.3 cm. Rung 2 also counts only if overall success >= 0.8 with Wilson 95% CI reported.
+REPORTING required: sorted XY and yaw per walk, with start pose (d, phi, psi) and seed; median, IQR, max; counts of XY > 2 / > 3 cm and yaw >= 7 / >= 10 deg; exact Clopper-Pearson upper bound on p(XY > 3 cm) and p(yaw >= 10 deg) per walk (0/24 -> two-sided 95% bound 14.2%); XY and yaw broken down by d, phi and psi to find any start-pose dependence; end-of-walk base speed; stage-1 table for both candidates against R-080.
+FREEZE: no gain or term changes after filing. Any change requires a successor hypothesis.; evidence: RS-017, X-040, R-080, R-081, H-014, H-012, RS-015, R-053)
+- **H-017** [open] by method_designer: [Rung 4 | SUCCESSOR of H-011 (refuted by RS-018, X-043: v4_mpc 0/24 vs fresh v0 24/24) | label: agent hypothesis by method_designer | FILED BEFORE ANY RUN | status: OPEN, untested. Neither methods/v4_mpc_carry.yaml nor its stage or task exists yet. Pre-registration holds if this record's created time is earlier than the first v4_mpc_carry run.]
+
+DECISION: grasp-then-MPC-place, keeping the weld explicitly. Push-placement is rejected.
+Why this fits the ladder:
+(1) Rung 4 replaces one oracle only, 'scripted placement'. Push-placement silently removes the grasp too (rung 3's subject), so it changes two things at once. That is exactly what made v4_mpc uninterpretable: it was labelled weld_grasp but ran non-prehensile.
+(2) Pushing dead-ends at T1. Cube-on-cube and brick stacking need a lift, so a push placer can never clear rung 4 beyond T0.
+(3) Carry-place composes with rung 3 later: swap the weld for the real grasp (v3_*) and keep the MPC placer unchanged.
+(4) It removes RS-018's root cause by construction. With the block in hand, the placement term changes from the first control step, so no 0.8 m contact-free approach is needed.
+Other alternatives rejected: v4_place (scripted IK with closed-loop correction) is already adopted (D-007), and it is a scripted correction rather than a lab-chosen placement, so it does not test the MPC question. MPPI instead of CEM would add a second change; it stays a future ablation. VLM-chosen placement does not do continuous control. RL and VLA policies are not installed.
+
+CLAIM: H-011 failed because of the task formulation (pushing with no contact gradient, 6/m vs 220/m) and a minimal search budget (24 samples, 1 iteration, 13 of 600 s used), not because Relic-in-the-loop CEM cannot place. If the block is welded in hand from t=0, Spot's base is held fixed, and CEM gets 128 samples x 4 iterations, the MPC will bring the block to the target and the fixed release predicate will fire within tolerance.
+
+METHOD v4_mpc_carry (planned yaml; the workspace is read-only for method_designer, so robotics_engineer commits this verbatim):
+stages: perceive=oracle, plan_order=oracle, build=sumo_mpc_weld_carry_place (NEW)
+sumo: task=spot_block_mpc_carry (NEW, lab/sumo_tasks/spot_block_mpc_carry.py), policy=Relic, optimizer=cem, num_rollouts=128 (was 24), max_opt_iters_per_step=4 (was 1), horizon_s=2.0, episode_length_s=10.0, forced_release_s=8.0, post_release_s=1.0, timeout_s=1800, object_pose_qpos_index=26 (re-verify after the weld edit), log_per_step_cost=true.
+PRE-REGISTERED COST CHANGES (everything else is frozen at v4_mpc values: w_place_orientation 80, w_upright 280, w_collision 250, w_object_settle 18, w_object_angular_velocity 45, w_base_stability 100, w_action_rate 0.25):
+- Approach term: w_gripper_object 6 -> 0 and w_gripper_height 80 -> 0. Under the weld the gripper-to-block offset is constant, so these terms carry no signal. The 'approach' is now the placement term itself, which has a nonzero gradient from step 0.
+- w_place_position stays 220/m linear. Added: w_place_quadratic=1000/m^2 (on ||e||^2) and w_terminal_place=1000/m on ||e|| over the last 25% of each rollout. These give fine convergence plus the stop-at-goal incentive that H-011's overshoot showed was missing.
+- w_hover=300/m on max(0, goal_z+0.03 - block_z) while xy error > 0.02 m. This stops the block dragging on the floor or striking the support before it is over the target.
+- After release: w_retreat=50/m rewarding gripper z rise, plus the block settle terms. No term rewards touching the block.
+- Release predicate (fixed, not chosen by the MPC): xy error <= 1.0 cm, 0 <= z - goal_z <= 1.5 cm, block speed <= 0.05 m/s, yaw error <= 5 deg. Forced release at t=8.0 s, logged as forced.
+- Expected compute: about 21x v4_mpc's planning, i.e. about 280 s per episode, inside the 1800 s timeout.
+
+IDEALIZATIONS (corrected; this replaces v4_mpc's wrong list):
+oracle_structure_spec, oracle_build_order, oracle_block_pose (Sumo reads the true state), weld_grasp (Sumo equality weld gripper<->block, active from t=0 until the release predicate), oracle_pick (the block starts welded in hand; no pick motion is run or scored), scripted_release_trigger, fixed_base (Sumo base velocity commands clamped to 0; Relic keeps stance, base pose = lab fixed base pose), welded_block_gripper_contacts_excluded (only while welded), sumo_box_proxy_dynamics, sumo_to_assembly_state_bridge (teleport the lab block to its Sumo pose at release + 1.0 s, never snap to goal).
+NOT claimed: no_arm_block_collision. After release, arm-block contact in Sumo is real, and the lab arm is never moved near the bridged block.
+ERRATUM for v4_mpc / R-082: 'weld_grasp' and 'no_arm_block_collision' were listed but not in effect (RS-018). The true list was oracle_structure_spec, oracle_build_order, oracle_block_pose, sumo_box_proxy_dynamics, sumo_to_assembly_state_bridge, plus a walking (not fixed) Sumo base. The task was non-prehensile pushing. Annotate R-082 rather than editing v4_mpc.yaml, so its fingerprint stays intact.
+
+MECHANISM CHECK (per-step log required). Each MPC step writes: t, the executed (best) sample's total cost and each term separately, the sample mean and min cost, the block-goal xyz and yaw error, the weld flag, base xy displacement from start, and the CEM iteration count actually run. Each episode also logs release time, forced-release flag, the block error at release, and the block error at the bridge.
+Pass requires ALL of:
+(m1) the release predicate fires (not forced) in >= 44/48 episodes;
+(m2) the median block xy error at release is <= 1.0 cm;
+(m3) the executed placement term (position + quadratic) at release is <= 20% of its step-0 value in >= 44/48;
+(m4) the median drift from release to the bridge is <= 1.5 cm;
+(m5) the median steps actually run equal 4 CEM iterations and 128 samples (the budget really applied).
+
+PREDICTED EFFECT: see predicted_effect.
+
+DESIGN (X-new): T0-dev-01..06 x seeds 0-7, 48 identical (scene, seed) pairs per arm. Arm A is v4_mpc_carry; arm B is a FRESH v0 on the same pairs. One frozen commit and an identical run fingerprint (git head, workspace_sha256, workspace_files, Sumo native .so sha256s) across both arms. One run_sim_batch per method with explicit pairs, max_workers=1, Sumo not overlapped with any other batch. Default lab physics in both arms. Pre-run gate, excluded from analysis: 2 smoke episodes on T0-dev-01 seeds 100-101 to confirm the weld, the clamped base, the per-step log and the timing. Gate results are recorded but do not count. Total about 98 episodes.
+
+RULES (applied in order; stop at the first that applies):
+VOID if any of the following: the arms differ in commit, fingerprint or pair list; any bridge_snaps_to_goal=true or any sumo_object_goal_mismatch; the weld is not active at t=0, or the weld drops before the predicate or forced release, in any episode; Sumo base xy displacement > 2 cm in any episode (fixed_base violated); the per-step cost log is missing in > 2 episodes; > 2 timeouts or adapter crashes; fresh v0 < 44/48 (control broken).
+NOT CLEARED if v4_mpc_carry < 39/48 (point estimate < 0.8). H-017 is then refuted, and the per-step log decides the successor: search (m3 fails) vs release/settle (m3 passes, m4 fails).
+CLEARED (rung 4 at T0) if >= 39/48 AND m1-m5 all pass. Report the Wilson 95% CI and the paired median block-error difference vs v0.
+CLEARED-ON-TARGET, MECHANISM REFUTED if >= 39/48 but any of m1-m5 fails. The rung counts per the rung_rule, H-017 is refuted on its mechanism clause, and a successor is required (same treatment as D-011 / H-014).
+The numeric prediction (>= 44/48) is scored separately. 39-43/48 clears the rung but refutes the effect-size claim.
+Out of scope: T1 stacking (the next experiment, if cleared), real grasp (rung 3), walking (rung 2).
+
+ROBOTICS_ENGINEER MUST BUILD (method_designer writes no code):
+1. lab/sumo_tasks/spot_block_mpc_carry.py: a new task (do not modify spot_block_mpc_place.py, so the X-043 provenance holds). Requirements: an equality weld between the gripper body and box_body, active at reset with the block at the grasp offset in the reset arm pose; contact exclusion between gripper geoms and box while welded; base velocity commands clamped to 0 (CEM samples arm, torso and gripper only); reset base pose equal to the lab fixed base pose in the assembly frame; the cost terms above with these exact weights; the release predicate, deactivating the weld via eq_active, plus forced release at 8.0 s; w_retreat after release.
+2. lab/sumo_adapter/run_task.py: expose --max-opt-iters-per-step and honour it; per-step JSONL cost logging (every term, best/mean/min, weld flag, base displacement, iterations run); report release_time_s, forced_release, block error at release, and the pose at release + post_release_s.
+3. lab/stages/sumo_build.py: a new @stage('build','sumo_mpc_weld_carry_place') that reuses _run_sumo and _episode. It bridges the block pose at release + 1.0 s, keeps the goal-echo guard and bridge_snaps_to_goal=False, logs post-transfer drift, and adds failure tags mpc_carry_forced_release, weld_dropped_early and base_moved.
+4. Commit methods/v4_mpc_carry.yaml exactly as specified here, then run validate_method on T0-dev-01..06.
+5. Annotate R-082 / v4_mpc with the idealization erratum above (record note, no yaml edit).
+6. Freeze one commit for both arms and run the 2-episode gate before the batch. (predicted: v4_mpc_carry T0 success >= 44/48 (>= 0.92; Wilson lower bound about 0.80) vs fresh matched v0 (expected 48/48) on the same 48 pairs and one frozen commit. Median block position error <= 2.0 cm; median xy error at release <= 1.0 cm. The release predicate fires unforced in >= 44/48. The executed placement term falls to <= 20% of its step-0 value by release in >= 44/48. Planning is about 280 s per episode (no timeouts at 1800 s). Rung 4 clears at >= 39/48 only if mechanism checks m1-m5 pass.; evidence: RS-018, R-082, R-083, D-011)
+- **H-018** [open] by method_designer: [Rung 4 | AMENDMENT of H-011 (OPEN: "not cleared; method-as-described untested", per D-012 and the reviewer's REJECT of RS-018) | SUPERSEDES H-017. H-017 was filed on the premise that H-011 had been refuted, and it dropped H-011's no_arm_block_collision. H-017 must never be run. | label: agent hypothesis by method_designer | FILED BEFORE ANY RUN | status: OPEN, untested. No v4_mpc_weld run, config, stage or task exists yet.]
+
+PURPOSE: test H-011's method as H-011 described it: MPC (Sumo CEM, Relic) chooses the placement, with weld_grasp, no_arm_block_collision, fixed_base, oracle_block_pose, oracle spec and order, and the sumo_to_assembly_state_bridge. This closes the construct gap with a pre-run gate. The gate verifies that every listed idealization is actually in effect and that nothing unlisted is. R-082's numbers stand only as "the implemented pusher failed"; they are not evidence about this method.
+
+WHY WELD-CARRY AND NOT PUSH: H-011 itself specified a weld grasp, so an amendment must keep it. Pushing would also remove the grasp, which is rung 3's subject, and that breaks replace-one-oracle. Pushing also cannot stack, so it dead-ends at T1. Weld-carry composes with rung 3 later: replace the weld, keep the MPC placer. Rejected alternatives: v4_place (scripted correction; already adopted, D-007), MPPI (a second change; future ablation), VLM placement (not continuous control).
+
+IDEALIZATIONS: H-011's list, kept exactly and now enforced, plus three that H-011 left implicit, now named:
+H-011's list:
+- oracle_structure_spec
+- oracle_build_order
+- oracle_block_pose: Sumo reads the true block state.
+- weld_grasp: Sumo equality weld between gripper and box_body; eq_active=1 from t=0 until the release predicate fires, then 0.
+- no_arm_block_collision: every robot geom (arm, gripper, body, legs) has collision with the block disabled for the WHOLE episode via contype/conaffinity. The block still collides with the floor and target supports. This is the same idealization v0 uses, so the v0 comparison isolates placement alone.
+- fixed_base: Sumo base velocity commands clamped to 0; Relic holds stance; base pose equals the lab fixed base pose. H-011's "to confirm" is now enforced.
+- sumo_to_assembly_state_bridge: teleport the lab block to its Sumo pose at release + 1.0 s; never snap to goal.
+Named additions:
+- oracle_pick: the block starts welded in hand at the reset arm pose; no pick motion is run or scored.
+- scripted_release_trigger: the weld is turned off by a fixed predicate, not chosen by the MPC.
+- sumo_box_proxy_dynamics: Sumo's box model stands in for the block.
+Nothing else is assumed. Erratum for v4_mpc / R-082 (record note only; do not edit the yaml): weld_grasp, no_arm_block_collision and fixed_base were listed but not in effect. The Sumo base walked, and the task was non-prehensile pushing.
+
+METHOD methods/v4_mpc_weld.yaml (the workspace is read-only for method_designer; robotics_engineer commits it verbatim):
+name: v4_mpc_weld; rung: 4; idealizations: [the 10 above]; arm_block_collision: false
+stages: perceive=oracle, plan_order=oracle, build=sumo_mpc_weld_carry_place (NEW)
+sumo:
+- task=spot_block_mpc_weld (NEW, lab/sumo_tasks/spot_block_mpc_weld.py); policy=Relic; optimizer=cem
+- num_rollouts=128 (was 24); max_opt_iters_per_step=4 (was 1); horizon_s=2.0
+- episode_length_s=10.0; forced_release_s=8.0; post_release_s=1.0; timeout_s=1800
+- object_pose_qpos_index: re-derived after the model edit and asserted at runtime
+- log_per_step_cost=true; emit_idealization_manifest=true
+
+PRE-REGISTERED COST CHANGES vs v4_mpc. Frozen at v4_mpc values: w_place_orientation 80, w_upright 280, w_collision 250, w_object_settle 18, w_object_angular_velocity 45, w_base_stability 100, w_action_rate 0.25.
+- Approach term: w_gripper_object 6 -> 0 and w_gripper_height 80 -> 0. Under the weld the gripper-to-block offset is constant, so neither term carries signal. The placement term is now live from step 0, which replaces approach shaping. RS-018's "6 vs 220" diagnosis becomes moot by construction rather than tested; RS-018's root-cause claim stays untested.
+- Placement: w_place_position 220/m linear (unchanged). Added w_place_quadratic 1000/m^2 and w_terminal_place 1000/m over the last 25% of each rollout (the stop-at-goal incentive).
+- w_hover 300/m on max(0, goal_z + 0.03 - block_z) while xy error > 0.02 m.
+- After release: w_retreat 50/m on gripper z rise.
+- Release predicate: xy error <= 1.0 cm, 0 <= z - goal_z <= 1.5 cm, block speed <= 0.05 m/s, yaw error <= 5 deg. Forced release at 8.0 s, logged.
+- Expected compute: about 21x v4_mpc, roughly 280 s per episode.
+
+PRE-RUN CONSTRUCT GATE: pass/fail, excluded from analysis, recorded as its own run. Run it on the frozen commit that the batch will use. Smoke: T0-dev-01..06 x seed 100 (6 episodes; one per scene because start and goal bearings vary by about +-35 deg).
+ALL of the following must hold in EVERY smoke episode:
+- G1 attached: eq_active=1 at t=0 and at every logged step before release. Welded block-to-gripper relative pose drift <= 1 mm and <= 1 deg.
+- G2 lifted: block z >= start z + 0.05 m at some step before release. Block-floor contact count = 0 between first lift and release, except at the target.
+- G3 no_arm_block_collision: total robot-geom/block contact count = 0 over the whole episode (logged every physics step, not only control steps). The model check confirms contype/conaffinity exclusion for every robot geom.
+- G4 fixed_base: base xy displacement <= 2 cm and yaw change <= 2 deg over the episode.
+- G5 release: eq_active turns 0 exactly once, at the predicate or the forced time. Block-gripper distance grows by >= 3 cm within post_release_s.
+- G6 budget: the log shows 128 samples and 4 CEM iterations on >= 95% of steps.
+- G7 logging: per-step JSONL contains every cost term (executed best plus sample mean and min), block-goal error, weld flag, base displacement and contact counts.
+- G8 manifest: the stage emits a runtime idealization manifest derived from the actual flags (weld active, collision masks, base clamp, bridge mode, pick mode, release mode). It must equal the yaml idealizations list EXACTLY: same set, no extras, none missing.
+- G9 visual: render_rollout contact sheets for 2 smoke episodes, read by analyze_rollout/v1. They must show the block held above the floor and carried, never pushed.
+If any check fails: no batch. The engineer fixes the code only, with no change to weights, budget, predicate or design, and re-runs the full gate on a new frozen commit. Any parameter change needs a new filed amendment first. Gate outcome numbers (placement success) are not inspected or used for tuning.
+
+MECHANISM CHECK on the batch, from the per-step log. Pass requires ALL of:
+- m1: the release predicate fires unforced in >= 44/48 episodes.
+- m2: the median block xy error at release is <= 1.0 cm.
+- m3: the executed placement term (linear + quadratic) at release is <= 20% of its step-0 value in >= 44/48.
+- m4: the median drift from release to the bridge is <= 1.5 cm.
+- m5: G1-G4 and G8 re-checked per episode, holding in 48/48.
+
+DESIGN: T0-dev-01..06 x seeds 0-7, giving 48 identical (scene, seed) pairs per arm.
+- Arms: A = v4_mpc_weld; B = a FRESH v0 on the same pairs.
+- Both arms on one frozen commit with an identical fingerprint: git head, workspace_sha256, workspace_files, and the Sumo native .so sha256s, all matching the gate run.
+- One run_sim_batch per method with explicit pairs; max_workers=1; Sumo not overlapped with other batches; default lab physics.
+- Episodes: about 102 (6 gate + 48 + 48).
+
+RULES (applied in order; stop at the first that applies):
+VOID if any of the following:
+- the gate did not pass on the same commit and fingerprint as the batch;
+- the arms differ in commit, fingerprint or pairs;
+- G1, G3, G4 or G8 fails in any batch episode (construct broken mid-run; flagged at runtime with tags construct_weld, construct_collision, construct_base, construct_manifest);
+- any bridge_snaps_to_goal=true or any sumo_object_goal_mismatch;
+- the per-step log is missing in > 2 episodes;
+- > 2 timeouts or crashes;
+- fresh v0 < 44/48.
+VOID means H-011 stays OPEN/untested.
+NOT CLEARED if v4_mpc_weld < 39/48. H-011 and this amendment are then REFUTED as described, because the construct has been verified. The per-step log assigns the successor: search failure if m3 fails; release/settle failure if m3 passes and m4 fails.
+CLEARED (rung 4, T0) if >= 39/48 AND m1-m5 all pass. Report the Wilson 95% CI, the paired median block-error difference vs v0, and the six-scene caveat (seeds within a scene are not independent scenes).
+CLEARED-ON-TARGET, MECHANISM REFUTED if >= 39/48 but any of m1-m4 fails. The rung counts per the rung_rule; a successor is required.
+The numeric prediction (>= 44/48) is scored separately.
+Out of scope: T1, real grasp (rung 3), walking (rung 2).
+
+ROBOTICS_ENGINEER MUST BUILD (method_designer writes no code):
+1. lab/sumo_tasks/spot_block_mpc_weld.py, a new file; leave spot_block_mpc_place.py untouched for X-043 provenance. It needs:
+   - the weld equality (gripper <-> box_body) active at reset, with the block at the grasp offset;
+   - contype/conaffinity masks removing ALL robot-block collisions while keeping block-floor and block-support collisions;
+   - base command clamp to 0 and base reset to the lab fixed base pose;
+   - the cost terms and release predicate above, with release via eq_active=0;
+   - the forced release.
+2. lab/sumo_adapter/run_task.py:
+   - a --max-opt-iters-per-step setting that is actually honoured;
+   - per-step JSONL logging (all terms, weld flag, base displacement, robot-block and block-floor contact counts per physics step, samples and iterations run);
+   - release_time_s, forced_release, error at release, and the pose at release + post_release_s.
+3. lab/stages/sumo_build.py: a new stage sumo_mpc_weld_carry_place reusing _run_sumo and _episode. It needs:
+   - the bridge at release + 1.0 s, keeping the goal-echo guard and bridge_snaps_to_goal=False;
+   - the runtime idealization manifest, compared to the yaml with a construct_* failure tag on mismatch;
+   - tags mpc_carry_forced_release, construct_weld, construct_collision, construct_base and construct_manifest.
+4. A gate checker that evaluates G1-G8 from the logs and prints PASS/FAIL per check per episode, plus render_rollout for G9.
+5. Commit methods/v4_mpc_weld.yaml as specified, run validate_method on T0-dev-01..06, then freeze ONE commit for gate + both arms.
+6. Record note on R-082 / v4_mpc with the idealization erratum. (predicted: If the construct gate passes: v4_mpc_weld T0 success >= 44/48 (>= 0.92; Wilson lower bound about 0.80) vs a fresh matched v0 (expected 48/48) on 48 identical pairs and one frozen commit. Median block position error <= 2.0 cm. Median xy error at release <= 1.0 cm. Unforced release in >= 44/48. Placement term at release <= 20% of step 0 in >= 44/48. Zero robot-block contacts, the weld held until release, and base drift <= 2 cm in 48/48. No timeouts at 1800 s (about 280 s per episode). Rung 4 clears at >= 39/48 only with m1-m5 passing.; evidence: H-011, RS-018, D-012, R-082, R-083, H-017)
+- **H-019** [supported] by method_designer: [Rung 5 | agent hypothesis by method_designer | SUCCESSOR of H-013 and H-015. Both stay OPEN; X-045 was VOIDED by D-013 under H-015 A3, and this record replaces them for all future rung-5 runs. FILED BEFORE ANY v47 RUN, with NO code written. Pre-check just before filing: query_record(kind=run, contains '"method": "v47') returned empty. The positive control '"method": "v46' returned R-085 and R-084, so the filter works. methods/v47_vlm_anchor.yaml and its stage do not exist yet. Confirm by checking that this record's created time is earlier than the first v47 run.]
+
+DEFECT (RS-020, exploratory): lab/stages/vlm_measure.py sets bottom_reference = (min + max of the layer-0 block centre columns) / 2, and then computes y = -(u - bottom_reference) / ppm. Every measured layout is therefore re-centred on the structure's own bottom-layer midpoint, which loses the whole-structure lateral offset c0. On scenes with c0 != 0 every block gets the same error, e = -c0: T2-dev-20 3.9 cm, T2-dev-23 4.3-4.8 cm, T3-dev-24 2.0 cm. That explains all 4 Arm B v46 misses, with |p| < 0.5 cm on T2-dev-23.
+
+CLAIM: if the measured layout is anchored in the table/world frame with the known camera model of the target picture, instead of re-centring, the common-mode error goes away. v47 then reaches >= 14/16 on fresh off-grid T2/T3, including structures offset >= 4 cm, without losing T1.
+
+MECHANISM (uses only the target picture and its camera; no simulator state). The 'robot side' target view is rendered by a fixed, known camera:
+- lookat = structure-frame (0, 0, 0.12) m; azimuth 0, elevation -12 deg, distance 1.1 m; 480x360 px; vertical fovy 45 deg (MuJoCo default).
+- So the camera centre is at structure-frame (-1.076, 0, 0.349), looking along +x, tilted 12 deg down.
+- The camera lies in the y=0 plane, so every point with y=0 projects to the principal column cx = 239.5 px, whatever its x or z. This is the world anchor.
+- f = 180 / tan(22.5 deg) = 434.6 px.
+- For a block point with known x and z (camera-facing face x = -0.06 m, or the handle at x = -0.09 m; z = 0.05 + 0.10*layer, plus 0.03 for the handle), depth along the optical axis is d = (P - C) . fwd, with fwd = (0.978, 0, -0.208). For the face centre this is about 1.056 m at layer 0 and 1.014 m at layer 2. Then y = (cx - u) * d / f, with +y to the left in the image.
+- Scale and origin both come from the camera model. The block-width scale (v46's ppm) is kept only as a logged cross-check.
+- u must be measured at a point whose 3D location on the block is known: the camera-facing face or the handle centre, NOT the bbox of a mask that also contains the top face. Perspective shifts the far top-face edge by about 1 cm at |y| = 10 cm.
+- In the real-world analogue this is a calibrated camera with known pose relative to the build site, so it is named as a new idealization: known_target_camera.
+
+REJECTED ALTERNATIVES:
+(i) Keep the bottom-midpoint re-centring and add a VLM 'absolute offset' estimate. VLMs are weak metric estimators and vary per sample (H-013 ii), and this reintroduces nondeterminism into geometry, which RS-020 showed is currently deterministic.
+(ii) Use the checkerboard floor as a table reference. Its phase relative to the build site is a render detail that the stage would have to learn, it is partly occluded by the structure, and detecting it adds a failure mode. The fixed camera is strictly simpler and exact. The floor may be logged later as a diagnostic; it is not required.
+(iii) The top view as the anchor. It works in principle, but it needs a second detection pipeline in a second view, for no gain over the side view, which is already in the y=0 plane.
+(iv) Reading scene.target, scene.start or simulator state for y: forbidden.
+(v) MPC, training or VLA: irrelevant to a perception registration error, or not installed.
+
+SINGLE CHANGE vs v46: only the y-origin and scale of the geometric measurement change. The VLM call (codex, prompts/perceive/v2.md, multiview, fresh_per_seed, cached=false), the colour/white masks, plan_order=oracle and build=closed_loop_weld_place with v46's params are all byte-identical.
+
+METHOD methods/v47_vlm_anchor.yaml (written by method_designer only once the stage is registered; validate_method must pass). It is v46_vlm_measure.yaml with:
+- name: v47_vlm_anchor
+- stages.perceive: vlm_measure_anchored (NEW)
+- idealizations: v46's 9 (oracle_build_order, oracle_block_pose, fixed_base, weld_grasp, no_arm_block_collision, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer) + known_target_camera.
+
+PRE-REGISTERED RULES
+
+(R1) MISSING-BLOCK RULE. Matching uses the runner's existing matcher (colour + type -> true_id), frozen as the definition.
+- A true block with no matched perceived block is MISSING: e_status = "missing" and e = null by design.
+- A perceived block with no true match is SPURIOUS.
+- Both are perception failures. The episode is scored by the frozen metric and counted in the tally as is (it fails in practice).
+- They are reported as n_missing and n_spurious per arm, with a list of the episodes.
+- Missing or spurious blocks NEVER void the experiment.
+
+(R2) VOID ONLY IF:
+(V1) the fingerprints differ: any primary batch (v47 arm or v0 arm) has a run_fingerprint.id (git_head + workspace_sha256) different from the other;
+(V2) a MATCHED block in a primary v47 episode lacks a code-logged e or p, or its episode lacks cached=false or the VLM response hash. cached=true counts as missing telemetry for that episode's matched blocks.
+Nothing else voids.
+
+(R3) LOGGED BY CODE (not derived afterwards). For every block in every v47 episode, with ground truth used only after perception, for scoring:
+- per true block: e_status, e = perceived y - true y (cm, signed), and p = final y - perceived target y (cm, signed);
+- u_px, measurement point (face or handle), d_m and y_anchored;
+- y_recentred, i.e. v46's bottom-midpoint formula computed from the same pixels (a counterfactual control);
+- ppm_camera and ppm_blocks.
+Per episode: cached, cache_mode, response/prompt/image sha256, fallback_blocks.
+
+(R4) ONE PRIMARY BATCH PER ARM. The primary batch is the first batch per (experiment, method) on the frozen fingerprint, by captured_at. Any further batch is excluded from ALL analysis (no replicate, no pooling). Runner guard b42df27 is set to cap v47 at 40 and v0 at 16.
+
+DESIGN (X-new)
+Step 1: build, audit, Gate 0.
+Step 2: generate the scenes.
+Step 3: freeze ONE commit and run both arms.
+
+GATE 0 (offline, 0 episodes; not a verdict; if it fails, no episodes and a successor is filed):
+(G0a) Synthetic calibration. Render calibration pictures, not benchmark scenes, with render_structure_views: single cubes at y in {-0.12, -0.06, 0, +0.04, +0.10} m, and a 2-cube stack at y = +0.07 (layer 1). Feed them to the measurement with the true structure. Pass: |e| <= 0.3 cm on every block.
+(G0b) Already-seen dev scenes T2-dev-11..23 and T3-dev-13..24, with the ORACLE structure (ids, colours, types, layers) to isolate the geometric step. Pass: median |e| <= 0.5 cm, max |e| <= 1.5 cm, and per-scene mean e on T2-dev-20 and T2-dev-23 within +/-1.0 cm (v46: -3.9 and +4.5).
+(G0c) Code audit by the reviewer: the stage reads only scene.image_multiview, scene.image_views['robot side'] and the camera constants, and never scene.target, scene.start or sim state. A unit test asserts that the stage's camera constants equal sim.STRUCTURE_VIEWS['robot side'], the render size, and the model fovy.
+
+CONFIRMATORY SCENES: 8 NEW dev scenes, T2-dev-24..27 and T3-dev-38..41, made with make_dev_scene AFTER the v47 code is committed and Gate 0 passes.
+- They are generated by the analyst or PI, not by the robotics_engineer and not by method_designer.
+- Constraints are checked from spec numbers only. Nobody views their pictures or runs any perception on them before the primary batches.
+- They are committed in a scenes-only commit, which is THE frozen commit.
+- Constraints (categories may overlap):
+  - (a) 4 T2 + 4 T3;
+  - (b) every scene off the 6.5 cm grid: >= 1 block >= 1.0 cm from the nearest multiple of 6.5 cm;
+  - (c) >= 2 staircases, with a monotone per-level offset of >= 1.5 cm;
+  - (d) >= 2 with a white block (cube or brick) as a bridge span or pier;
+  - (e) >= 2 with a large whole-structure lateral offset, |c0| >= 4.0 cm, where c0 is the midpoint of the min and max layer-0 block centres. They must include both signs, and >= 1 must be T2;
+  - (f) stable and reachable (make_scene checks).
+- Disclosure: during this filing method_designer opened the T3-dev-25 spec. It is not in the set.
+
+ARMS (seeds 0-1, paired by (scene, seed), one frozen commit):
+- v47 primary batch: 8 new scenes x 2 = 16 confirmatory episodes, plus T1-dev-01..12 x 2 = 24 T1 non-regression episodes. Total 40.
+- FRESH v0 primary batch: the same 16 confirmatory pairs.
+- Total 56 episodes.
+- The verdict is absolute. v0 is the matched reference, with exact McNemar reported but not required.
+
+IDEALIZATIONS STILL IN USE (v47): oracle_build_order, oracle_block_pose (the closed-loop correction reads sim truth), fixed_base, weld_grasp, no_arm_block_collision, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera. scripted_arm is implicit in closed_loop_weld_place. v0 additionally uses oracle_structure_spec.
+
+ROBOTICS_ENGINEER MUST BUILD (method_designer writes no code):
+1. lab/stages/vlm_measure.py: a NEW @stage('perceive', 'vlm_measure_anchored'). Leave vlm_measure / vlm_measure_telemetry unchanged for v46 provenance.
+   - Reuse the VLM call and the colour/white masks verbatim.
+   - Replace bottom_reference and the block-width ppm with the pinhole inverse above. Camera constants are declared in the stage and asserted against sim by a unit test.
+   - Measure u at the camera-facing face or the handle centre, and log which one.
+   - No fallback to VLM rough_y unless the colour is undetected. A fallback still counts as a measured block with an e.
+2. Telemetry (R3), written by code, in episodes.jsonl:
+   - perceive.block_position_errors gets e_status, e, p, u_px, d_m, y_anchored, y_recentred, ppm_camera and ppm_blocks;
+   - spurious perceived blocks are listed;
+   - p is computed by the runner after the build from the final pose and the perceived target.
+3. Failure classifier: label an episode perception_localization when a failing matched block has |e| > 1.5 cm and |p| <= 1.5 cm. It must never again label it placement_error (RS-020 surprise 2). Labels are descriptive and do not enter the verdict.
+4. The Gate 0 script (G0a, G0b) printing per-block e. Render the G0a calibration pictures into a non-benchmark directory.
+5. Runner guard: set the cap per (experiment, method) to 40 (v47) and 16 (v0).
+6. Should: render_rollout replays the LOGGED parse instead of re-querying the VLM (RS-020 surprise 4). It is diagnostic only and not needed for the verdict.
+Then commit, pass Gate 0 and the G0c audit, hand off for scene generation, and run both primary batches on the scenes-only frozen commit. (predicted: PREDICTION (confirmatory set, 8 new off-grid scenes x seeds 0-1):
+- v47 15/16 (expected residual: about 1 VLM structure-parse failure, given the RS-020 rate of 6.9% per episode).
+- T1 24/24.
+- Matched-block median |e| <= 0.6 cm and max |e| <= 1.5 cm.
+- On every scene, per-scene mean e within +/-1.0 cm; specifically on the >= 2 large-offset scenes, where v46's recentring would have given |e| ~ |c0| >= 4 cm.
+- The counterfactual y_recentred on those scenes has |mean e_recentred| >= 3.5 cm, which shows the set has teeth.
+- n_missing + n_spurious <= 2 blocks over 16 episodes.
+- Fresh v0 about 14-16/16.
+
+THRESHOLDS (in order; the first that fires decides, after the VOID check):
+1. VOID only per R2: V1 the fingerprint differs between the arms' primary batches; V2 a matched block in a primary v47 episode lacks a code-logged e or p, or its episode lacks cached=false or the response hash. Missing or spurious blocks never void.
+2. REFUTED if v47 <= 10/16 on the confirmatory set, OR T1 <= 22/24.
+3. MECHANISM REFUTED, whatever the success rate, if any large-offset scene has |per-scene mean e| > 2.0 cm, OR the confirmatory matched-block median |e| > 1.5 cm. If success is >= 14/16 anyway, the label is 'SUPPORTED-ON-TARGET, MECHANISM REFUTED', and a successor is required.
+4. PARTIAL if v47 is 11-13/16 with T1 >= 23/24. The successor targets the dominant cause by the logged split:
+   - failures with missing or spurious blocks -> VLM structure parse;
+   - a failing matched block with |e| <= 1.5 and |p| > 1.5 cm -> placement (H-006);
+   - |e| > 1.5 cm -> measurement.
+5. SUPPORTED if v47 >= 14/16 AND T1 >= 23/24 AND every matched block in a failing episode has |e| <= 1.5 cm AND every large-offset scene has |per-scene mean e| <= 1.0 cm.
+
+REPORT:
+- Wilson 95% CIs.
+- Exact McNemar vs fresh v0 (reported, not required) and the scene-level tally (both seeds pass).
+- Per-block e and p tables, n_missing and n_spurious, and y_recentred vs y_anchored on the large-offset scenes.
+- Gate 0 results, labelled exploratory.
+
+COST: 56 episodes (40 v47 + 16 v0), about 56 VLM calls, plus offline Gate 0 (0 episodes).; evidence: D-013, RS-020, R-084, R-085, R-087, H-013, H-015, H-006, R-005, R-017)
+- **H-020** [supported] by method_designer: [Combined rungs 1+2+5 | agent hypothesis by method_designer | for X-049 | FILED BEFORE ANY v6_combo RUN, NO CODE WRITTEN. methods/v6_combo*.yaml does not exist yet; the primary build stage is not registered. The record timestamp must be earlier than the first v6_combo run.]
+
+CLAIM: the cleared components compose without a composition penalty. support_sort (rung 1, H-001/D-003) + v2_walk as is (rung 2, D-011/D-014; drift risk D-015 carried unchanged) + v47_vlm_anchor perception (rung 5, H-019/RS-024) together meet >= 0.8 success with a Wilson 95% lower bound >= 0.8 on BOTH T0 and T1 dev, against a fresh matched v0 on one frozen commit.
+
+CONDITIONAL BRANCH (fixed by one dated PI note BEFORE the freeze, and never after any episode):
+- BRANCH A (primary) applies if X-051 CLEARS. That means H-019 stays SUPPORTED after (i) reviewer ACCEPT of RS-024 and (ii) the V3(a) h4 on-disk rehash, which RS-024 left to the engineer, matching h2.
+- BRANCH B (fallback) applies otherwise: perceive swaps to v5_vlm and the test is RESTRICTED TO T0.
+- If X-051 is still pending at the freeze, nothing runs.
+
+METHOD v6_combo (Branch A). Written by method_designer once the build stage is registered and validate_method passes.
+- perceive: vlm_measure_anchored, with v47's perceive block verbatim (codex, prompts/perceive/v2.md, multiview, cache_mode fresh_per_seed, cached=false).
+- plan_order: support_sort.
+- build: sumo_walk_then_closed_loop_weld_place (NEW composite). It uses v2_walk's sumo block verbatim (spot_walk_approach, w_heading 160, Relic, cem, 24 rollouts, 4.0 s, tolerance 0.25 m, walk_starts varied_v1) and v47's params verbatim (place_correction_passes 2, segment 0.6 s, dwell 0.2 s, tolerance 0.001 m, max_step 0.04 m).
+- physics: lab default, the same in both arms.
+
+BUILD CHOICE, justified per rung:
+- Rung 2 was cleared with walk + scripted_weld. v47 (rung 5) was cleared with closed_loop_weld_place. So each rung is kept with the build it was cleared on, and the composite only takes the arm layer from the rung that depends on it.
+- Rung 2's claim concerns the base approach. Under the state bridge the arm layer after the bridge does not enter that claim, and the closed-loop place was adopted as the placement layer for combinations (D-007).
+- Rung 5's T1 clearance depends on the closed-loop place. The scripted arm's 1.5-1.9 cm pick-side bias plus perception error is what broke v5_vlm on T1 (D-002, 0.67).
+- So in Branch A, scripted_weld would bring back a known T1 failure mode, and the closed-loop place is required.
+
+METHOD v6_combo_t0 (Branch B; same as X-049's v6_combo_a). Its stages are already registered.
+- perceive: vlm, with v5_vlm's perceive block (codex, prompts/perceive/v1.md).
+- plan_order: support_sort.
+- build: sumo_walk_then_scripted_weld, with the v2_walk sumo block and params.
+- Here BOTH rungs were cleared with scripted_weld (v5_vlm on T0 in D-002; v2_walk on T0 in D-011), so it is the cleared build for each rung. T1 is excluded because v5_vlm+scripted failed T1.
+
+IDEALIZATIONS still in use. This is the union of v1_support_sort, v2_walk and v47 minus oracle_structure_spec and oracle_build_order, plus known_target_camera.
+- Branch A: weld_grasp, scripted_arm (implicit in closed_loop_weld_place), no_arm_block_collision, oracle_block_pose (the closed-loop correction reads sim truth), sumo_to_assembly_state_bridge, fixed_nominal_walk_start (D-011), clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera.
+- Branch B: weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, fixed_nominal_walk_start. There is no oracle_block_pose; known_target_camera is not used by v5_vlm and is listed as N/A.
+- DEVIATION, disclosed: fixed_base is in the literal union (via v1 and v47) but is DROPPED, because rung 2 replaces it with walking. Listing it would be false.
+- KNOWN RISK (D-015), carried as is: v2_walk has a 3.5 cm XY tail and yaw up to 12.15 deg. It is hidden from placement by the state bridge, which is still an idealization here. A walk outlier is reported and attributed, never excluded.
+
+DESIGN (X-049), on ONE frozen commit:
+- Branch A: T0-dev-01..06 x 8 = 48 pairs, and T1-dev-01..12 x 4 = 48 pairs. Arms: v6_combo 96 episodes vs FRESH v0 96 episodes (same pairs), 192 in total. One run_sim_batch per arm.
+- SEEDS are all distinct, so there are 96 distinct walks (the walk depends only on the seed, per D-008):
+  - T0-dev-k uses seeds 400+8(k-1) .. 407+8(k-1), i.e. 400..447;
+  - T1-dev-j uses seeds 500+4(j-1) .. 503+4(j-1), i.e. 500..547.
+- PRE-RUN SEED GATE: the analyst confirms by query_record that no prior run used any of these (scene, seed) pairs. On any collision, the whole block shifts by +1000 by dated note before any episode.
+- Branch B: the T0 half only, 48 + 48 = 96 episodes.
+- Sumo arm runs with max_workers=1. Plus at most 3 smoke episodes on T0-dev-01 seed 9999, which are excluded from all analysis.
+- Budget: 789 -> 594 (A) or 690 (B).
+- Pass line at n=48: >= 44/48 gives a Wilson LB of 0.804; 43/48 gives 0.778. So up to 4 failures per tier are allowed.
+
+RULES carried from H-019 (R1-R4, V3):
+- R1: missing or spurious blocks are perception failures, are scored as is, and never void.
+- R4: ONE primary batch per (X-049, method), the first by captured_at on the frozen fingerprint; any later batch is excluded from all analysis. Runner guard cap: v6_combo 96 / v0 96 (B: 48 / 48).
+- Scene-hash protocol for all 18 ids (scene json + the 6 pngs = 126 files): h1 now; h2 at freeze; h3 before each batch (on a mismatch the batch does not start); h4 after each batch.
+
+TELEMETRY, logged BY CODE per episode in episodes.jsonl. Ground truth is read only after perception, for scoring:
+- (T-perc) Perceived layout. Per true block: e_status (matched / missing), e = perceived target - true target (x, y, z, yaw; cm and deg), plus the list of spurious blocks. Also cached=false and the response, prompt and image sha256. Branch A also gets v47's u_px, d_m, y_anchored and y_recentred.
+- (T-order) Plan order: the planned id sequence, plus support_valid_perceived and support_valid_true. support_valid_true is checked against the TRUE spec's 'on' relations via the matcher.
+- (T-walk) Walk end pose BEFORE the bridge: XY error (cm) and yaw error (deg) against the nominal goal, plus the post-bridge base pose.
+- (T-place) Placement residual per block: p = final pose - perceived target (cm, deg).
+- (T-hash) The per-episode scene-file sha256 of the bytes actually read (H-019 P1).
+
+FAILURE ATTRIBUTION (ordered; first match wins; per failing combo episode; descriptive, not part of the verdict except where noted):
+1. order: support_valid_true = false. This is also a falsifier, see below.
+2. perception_structure: a missing or spurious block, or a wrong type or layer on a matched block.
+3. perception_localization: a failing matched block with |e_xy| > 1.5 cm and |p_xy| <= 1.5 cm.
+4. walk: walk-end XY > 3.0 cm or |yaw| >= 10 deg, AND a failing block with |p_xy| > 1.5 cm. A walk-end outlier on a passing episode is counted as 'walk_drift_absorbed' and is reported.
+5. placement: |e_xy| <= 1.5 cm and |p_xy| > 1.5 cm on a failing block.
+6. settle/orientation: every failing block has |e_xy| and |p_xy| <= 1.5 cm, but the episode fails on angle or topple (e.g. the T3-dev-42 cap yaw in RS-024).
+Each v0 failure is also labelled with classes 5-6. A failure that both arms share on the same pair is marked 'shared'.
+
+VOID (checked first; nothing else voids):
+- V1: the run_fingerprint.id (git_head + workspace_sha256) differs between the two arms' primary batches.
+- V2: missing telemetry. Any primary combo episode lacks e or p for a MATCHED block, or lacks the planned order or support_valid_true, or the walk-end XY and yaw, or cached=false and the response hash. cached=true counts as missing.
+- V3: scene hashes. In either arm, any episode lacks a per-episode scene-hash log, or any logged hash differs from h2, or the post-batch on-disk h4 differs from h2. Any of these voids that batch, and with R4 there is then no verdict. (predicted: PREDICTION (Branch A):
+- v6_combo: T0 >= 47/48 and T1 >= 46/48, Wilson 95% CIs reported. At the point predictions (47/48 and 46/48) the lower bounds are about 0.89 and 0.86.
+- Fresh v0: T0 about 48/48 and T1 about 47-48/48.
+- support_valid_true on 96/96.
+- Matched-block median |e_xy| <= 0.6 cm.
+- Walk-end XY > 3 cm on <= 3/96 episodes and |yaw| >= 10 deg on <= 3/96, with none of them failing (all absorbed).
+- Composition penalty: pairs where combo fails and v0 passes <= 2 per tier. Exact McNemar is reported, not required.
+Branch B (T0 only): v6_combo_t0 >= 46/48, v0 about 48/48.
+
+THRESHOLDS (in order; the first that fires decides, after VOID):
+1. VOID per V1-V3.
+2. REFUTED (order component) if support_valid_true = false on ANY episode, whatever the success rate.
+3. REFUTED if any tested tier is <= 38/48 (point estimate < 0.8).
+4. NOT CLEARED / PARTIAL if any tested tier is 39-43/48 (point >= 0.8 but Wilson LB < 0.8). The successor targets the dominant attribution class (order / perception_structure / perception_localization / walk / placement / settle). If walk is the dominant class, it reopens the D-015 walk-precision line as the blocker.
+5. SUPPORTED if every tested tier is >= 44/48 (Wilson LB >= 0.8) and threshold 2 does not fire. The combined method then clears rungs 1+2+5 on T0 and T1 (Branch B: T0 only), under the idealizations listed.
+A Branch B SUPPORTED makes no T1 claim.
+
+REPORT:
+- Per tier: tally, Wilson CI, v0 tally, exact McNemar and discordant pairs.
+- The attribution table for both arms.
+- Per-block e and p distributions, and walk-end XY and yaw distributions (including the absorbed outliers).
+- The seed gate, h1-h4, and the fingerprint.; evidence: H-001, D-003, D-011, D-014, D-015, H-019, RS-024, X-051, D-002, D-007, D-009, D-008, D-013, X-049)
+- **H-021** [open] by method_designer: [Rung 2 on T2/T3 | agent hypothesis by method_designer | for X-061 arm (a) | FILED BEFORE ANY X-061 RUN, NO CODE WRITTEN. Short pre-registration under the D-011 ladder rule.]
+
+CLAIM: v2_walk as is (rung-2 component adopted in D-011, with the D-015 drift risk carried unchanged) meets the success target on T2 and T3 dev: >= 44/48 per tier (Wilson 95% LB >= 0.8). The control is the SHARED fresh v0 batch of X-061, on the same 96 pairs at frozen commit 76cc1a7.
+
+METHODS: methods/v2_walk.yaml and methods/v0.yaml, verbatim at 76cc1a7. v2_walk idealizations (D-011): oracle_structure_spec, oracle_build_order, weld_grasp, scripted_arm, no_arm_block_collision, sumo_to_assembly_state_bridge, fixed_nominal_walk_start.
+
+PAIRS (exact; from X-061, which takes the scene/seed layout of X-059; j is the 0-based position in the list):
+- T2 scenes j=0..11 are 01,02,03,06,11,12,19,22,24,25,26,28; T2-dev-<j-th> gets seeds 2000+4j..2003+4j.
+  01:2000-2003, 02:2004-2007, 03:2008-2011, 06:2012-2015, 11:2016-2019, 12:2020-2023, 19:2024-2027, 22:2028-2031, 24:2032-2035, 25:2036-2039, 26:2040-2043, 28:2044-2047.
+- T3 scenes j=0..11 are 01,02,03,05,13,19,21,23,40,42,43,44; T3-dev-<j-th> gets seeds 2100+4j..2103+4j.
+  01:2100-2103, 02:2104-2107, 03:2108-2111, 05:2112-2115, 13:2116-2119, 19:2120-2123, 21:2124-2127, 23:2128-2131, 40:2132-2135, 42:2136-2139, 43:2140-2143, 44:2144-2147.
+- Both arms use the same 96 (scene, seed) pairs. The analyst re-runs the seed gate at the freeze; on any collision the whole block shifts by +1000 by dated note, before any episode.
+
+R4: ONE primary batch per (X-061, method): the first by captured_at on the frozen fingerprint. Later batches are excluded from all analysis. Runner caps come from X-061: v0 96 / v2_walk 96 / v6_combo 96. v2_walk runs with max_workers=1, serial with v6_combo and never overlapping it.
+
+SHARED CONTROL: one v0 primary batch serves this hypothesis and the v6_combo hypothesis filed alongside it. If that v0 batch is VOID, both hypotheses are VOID and neither gets a verdict.
+
+TELEMETRY (per episode, logged by code): walk-end pose BEFORE the bridge (XY error in cm and yaw error in deg against the nominal goal), the post-bridge base pose, per-block placement residual, and the per-episode sha256 of the scene files actually read.
+
+VOID (checked first; nothing else voids):
+- V1: the run_fingerprint.id (git_head + workspace_sha256) of the v2_walk primary batch differs from the v0 primary batch's, or either differs from 76cc1a7.
+- V2: any v2_walk primary episode lacks walk-end XY or yaw.
+- V3: in either arm, an episode lacks its per-episode scene-hash log, or a logged hash differs from the committed bytes of those files at 76cc1a7, or the post-batch on-disk rehash differs from them.
+
+FAILURE ATTRIBUTION (descriptive): each failed EPISODE gets one primary class, first match wins; other labels are listed as secondary, and failure_categories is never summed.
+1. walk: walk-end XY > 3.0 cm or |yaw| >= 10 deg, AND a failing block with |p_xy| > 1.5 cm.
+2. placement: failing block with |p_xy| > 1.5 cm and the walk within limits.
+3. settle/orientation.
+A walk outlier on a passing episode is counted as walk_drift_absorbed. Failures that both arms share on the same pair are marked 'shared'. (predicted: PREDICTION: v2_walk T2 >= 46/48 and T3 >= 46/48. Shared fresh v0 at about 47-48/48 per tier. Composition penalty (v2_walk fails, v0 passes) <= 2 per tier. Walk-end XY > 3 cm on <= 4/96 and |yaw| >= 10 deg on <= 4/96, with none of them causing a failure (all absorbed by the state bridge, as on T0/T1: RS-028, 4/96 absorbed).
+
+THRESHOLDS (in order; the first that fires decides):
+1. VOID per V1-V3, including a void shared v0 batch.
+2. REFUTED if either tier is <= 38/48 (point estimate < 0.8).
+3. NOT CLEARED / PARTIAL if either tier is 39-43/48. The successor targets the dominant attribution class; if that class is walk, the D-015 XY-fix line becomes the blocker.
+4. SUPPORTED (rung 2 cleared on T2 and T3) if both tiers are >= 44/48. Rung 2 would then be cleared on all four tiers under the listed idealizations.
+
+REPORT (descriptive, not part of the verdict):
+- per tier: tally, Wilson CI, v0 tally, discordant pairs and exact McNemar;
+- the attribution table;
+- walk-end XY and yaw TAILS: max, 95th and 90th percentile, and the count over 3 cm / 10 deg, per tier and pooled, with absorbed outliers listed by pair;
+- the fingerprint, scene-hash audit and seed gate.; evidence: D-011, D-014, D-015, RS-017, RS-028, D-008, X-059, X-061)
+- **H-022** [supported] by method_designer: [Combined rungs 1+2+5 on T2/T3 | agent hypothesis by method_designer | SUCCESSOR of H-020 | for X-061 arm (b) | FILED BEFORE ANY X-061 RUN, NO CODE WRITTEN.]
+
+CONDITION (decided before the freeze, never after any episode): this hypothesis is live ONLY IF the review of RS-028 (H-020's verdict on X-058) is ACCEPTED. When this was filed, RS-028.review = null. If the review REJECTS RS-028, or is still pending at the freeze, the v6_combo arm is DROPPED before the run and this hypothesis is withdrawn with no verdict. The v0 and v2_walk arms go on unchanged on the same commit.
+
+CLAIM: H-020's composition (support_sort + v2_walk + v47 anchored VLM perception + closed-loop place), SUPPORTED on T0/T1 in RS-028, extends to T2 and T3 dev: >= 44/48 per tier (Wilson 95% LB >= 0.8), against the SHARED fresh v0 batch of X-061.
+
+METHOD: methods/v6_combo.yaml verbatim at frozen 76cc1a7 (H-020 Branch A; the prompt nonce was removed at 76cc1a7). Idealizations as in H-020 Branch A: weld_grasp, scripted_arm, no_arm_block_collision, oracle_block_pose (closed-loop correction), sumo_to_assembly_state_bridge, fixed_nominal_walk_start, clean_distinct_colour_renders, x_zero, yaw_zero, z_from_layer, known_target_camera. fixed_base is dropped, as disclosed in H-020.
+
+PAIRS: identical to the companion v2_walk hypothesis filed in the same batch (X-061 / X-059 layout), with j as the 0-based position in each list:
+- T2 scenes 01,02,03,06,11,12,19,22,24,25,26,28 get seeds 2000+4j..2003+4j, i.e. 01:2000-03 ... 28:2044-47;
+- T3 scenes 01,02,03,05,13,19,21,23,40,42,43,44 get seeds 2100+4j..2103+4j, i.e. 01:2100-03 ... 44:2144-47.
+The seed gate and +1000 shift rule are as in the companion.
+
+R1 (carried): a missing or spurious block is a perception failure, is scored as is, and never voids.
+R4 (carried): one primary batch per (X-061, method), the first by captured_at on the frozen fingerprint. v6_combo cap 96, max_workers=1, run after v2_walk with no Sumo overlap.
+SHARED CONTROL: one v0 primary batch serves both hypotheses; if it is VOID, both are VOID.
+
+TELEMETRY carried from H-020 and its notes: T-perc (logged from the perceived spec BEFORE any handler empties it; e, e_status, matched ids, spurious blocks, cached=false, response/prompt/image sha256, and v47's u_px, d_m, y_anchored, y_recentred), T-order (planned sequence, support_valid_perceived, support_valid_true, verbatim planner exception), T-walk (pre-bridge XY and yaw, post-bridge pose), T-place (p per block), T-hash (per-episode scene-file sha256).
+
+CLASSIFIER carried (H-020 notes C1-C2, O1-O2 rulings):
+- STRUCTURE MISMATCH means, after the frozen matcher, any missing or spurious block, or a wrong type or a wrong LAYER on a matched block.
+- C1: primary class 'order' iff the structure matches AND (support_valid_true = false OR the planner raised).
+- C2: if the planner raises on, or orders invalidly, a mismatched structure, the primary class is perception_structure.
+- On a mismatch, support_valid_true is logged as 'n/a_mismatch', and V2 treats it as present.
+- Ordered classes after that: perception_localization, walk, placement, settle/orientation (H-020 definitions).
+- Counting is by FAILED EPISODES with one primary class each (H-020 note 5).
+
+VOID (checked first; nothing else voids):
+- V1: the fingerprint of the v6_combo primary batch differs from the v0 primary batch's, or from 76cc1a7.
+- V2: missing telemetry on a primary v6_combo episode. This covers e or p for a matched block; the planned order; support_valid_true ('n/a_mismatch' counts as present); walk-end XY or yaw; cached=false; the response hash; or the perception prompt_sha256. cached=true counts as missing.
+- V3: in either arm, a missing per-episode scene-hash log, or a logged hash or post-batch on-disk rehash that differs from 76cc1a7's committed bytes.
+- V4: the v6_combo primary batch shows more than one distinct perception prompt_sha256.
+
+PAIRED ATTRIBUTION v2_walk vs v6_combo (pre-specified, descriptive). Both arms see identical pairs, so each of the 96 pairs is put in a 2x2 table, per tier:
+- both pass;
+- v2_walk passes / v6_combo fails: attributed to perception or order. Report the v6_combo primary class; walk is expected to be ruled out because the walk depends only on the seed (D-008), and the walk-end poses are compared to confirm it;
+- v2_walk fails / v6_combo passes: report the v2_walk class; this most likely means the closed-loop place rescued a scripted_weld placement;
+- both fail: report each arm's class, and mark 'shared-walk' if both are walk.
+Also report the v0 outcome on each pair, and give exact McNemar for v6_combo vs v2_walk and for each vs v0. This analysis is descriptive and never changes a verdict. (predicted: PREDICTION (only if live):
+- v6_combo T2 >= 45/48 and T3 >= 44/48;
+- the most likely failure classes are perception_structure on 4-6 block pyramids and staircases, and placement non-convergence (cf. T0-dev-06 s1444 near-miss, RS-028);
+- support_valid_true true on every matched episode, and zero 'order' primary classes;
+- shared v0 at about 47-48/48;
+- pairs where v2_walk passes and v6_combo fails <= 3 per tier;
+- walk tails the same as in the v2_walk arm, since the walk is seed-determined.
+
+THRESHOLDS (the H-020 structure, in order; the first that fires decides):
+0. DROPPED (no verdict) if the RS-028 review is not ACCEPTED at the freeze.
+1. VOID per V1-V4, including a void shared v0 batch.
+2. REFUTED (order component) if ANY episode has primary class 'order' (C1), whatever the success rate.
+3. REFUTED if either tier is <= 38/48.
+4. NOT CLEARED / PARTIAL if either tier is 39-43/48. The successor targets the dominant class, using the paired v2_walk attribution to separate walk from perception/order.
+5. SUPPORTED if both tiers are >= 44/48 and threshold 2 does not fire. The combined ladder would then be cleared on T2/T3 under the listed idealizations.
+
+REPORT:
+- per tier: tally, Wilson CI, v0 and v2_walk tallies, discordant pairs, exact McNemar;
+- the attribution table for all three arms, plus the paired 2x2;
+- e and p distributions, and walk-end XY and yaw tails;
+- the set of distinct prompt_sha256 values (must have size 1);
+- the fingerprint, scene-hash audit, seed gate, and the RS-028 review status at the freeze.; evidence: H-020, RS-028, RS-027, RS-026, E-018, D-011, D-015, D-008, D-007, H-019, RS-024, X-060, X-061)
 
 ## Evidence
 
@@ -1126,3 +2471,148 @@ SCOPE: the walk start/goal is a fixed nominal pose, so a pass shows heading robu
 - **E-007** 2511.13782v1: SpatiaLite finds advanced VLMs rely predominantly on linguistic representations and show significant deficiencies on visual-centric tasks requiring perceptual spatial relations and 3D geometric transformations such as mental rotation. (relevance: Supports expecting orientation (10 deg) errors and 3D-relation mistakes when a VLM directly outputs block poses in rung 5.)
 - **E-008** 1810.11714v2: The CoSTAR Block Stacking Dataset contains nearly 12,000 real stacking attempts with 5.1 cm blocks and over 2 million frames, and grasping networks that work on prior datasets fail to generalize to this stacking task. (relevance: Real-robot stacking dataset/baseline; 5.1 cm block size gives scale for our 3 cm tolerance (~0.6 block width).)
 - **E-009** human PI measurement, 2026-10-04 + list_equipment mujoco_assembly_world.physics_option: Under MuJoCo's default contact model (pyramidal friction cone, impratio 1), blocks creep. In a minimal cube-on-cube test (mu=0.9, tilted gravity), the top block slid 3.6 cm at 30 deg tilt and slid off at 38 deg, although Coulomb friction predicts sticking up to 42 deg (atan 0.9). With physics {cone: elliptic, impratio: 10}, creep dropped about 50x (0.07 cm at 30 deg). (relevance: This may explain part of the rung-3 slips and drops (R-019: 5 drops and 2 slips on T0; R-020: 6 drops and 6 slips on T1) and the roughly 2 cm scripted-arm placement drift in RS-002/RS-003. Every result so far was produced under default physics, so these numbers may be confounded by simulator creep. Re-running under elliptic/impratio=10 would separate the controller error from the simulator artifact.)
+- **E-010** lab record: query_record(kind=run) for H-019, 2026-10-04: H-019 pre-freeze check (analyst, 2026-10-04): there are NO runs on any of the 12 scene ids. Checked with query_record(kind=run, contains='"<id>"') for: confirmatory T2-dev-24, T2-dev-25, T2-dev-26, T2-dev-28, T3-dev-40, T3-dev-42, T3-dev-43, T3-dev-44; excluded T2-dev-27, T3-dev-38, T3-dev-39, T3-dev-41. Every query came back empty. contains='"method": "v47' also came back empty. Positive controls: '"T2-dev-23"' returns R-087, and '"method": "v46' returns R-085, R-084, R-078 and R-077, so the filter works.
+S6 h1 (the sha256 baseline of the 56 confirmatory files) is NOT DONE. The analyst agent's sys_os_shell is denied by policy ("workspace is read-only"), so it cannot hash or stat any file. No file was opened, no picture was viewed and no perception was run. h1 must be recorded by an agent with shell access BEFORE any v47 code is committed. (relevance: H-019 S6/A1: this check confirms that no confirmatory or excluded scene has been run. It also flags that the h1 hash baseline is still missing, so the freeze must not go ahead until h1 exists.)
+- **E-011** lab-v1 git b42df274d0d537a420b3dfe90d08a1038a44fb31, scenes/dev/ (engineer read-only sha256 run, 2026-10-04); links H-019, E-010: H-019 FREEZE-BASELINE HASHES (step h1, S6). They supersede the "h1 NOT DONE" status in E-010.
+- Run by the engineer: read-only, bytes only, at lab-v1 HEAD b42df274d0d537a420b3dfe90d08a1038a44fb31, BEFORE any v47 code landed.
+- Filed verbatim by the analyst. The analyst did not recompute them (its shell is denied by policy).
+- 56 files = 8 confirmatory scenes x 7. All paths are under scenes/dev/.
+- Engineer attestation: all 8 confirmatory scene sets have mtimes between 2026-10-04T06:23:52Z and 06:29:48Z. The excluded T2-dev-27, T3-dev-38, T3-dev-39 and T3-dev-41 each have their 7 files on disk; they were not hashed, as S6 does not require it.
+- Not included: per-file mtimes (only the range above was provided) and the generator seeds listed in S6 (57024-57044).
+- These are the h1 reference. h2 (at freeze), h3 (before each primary batch) and h4 (after each batch, V3) must reproduce them exactly.
+
+556e495c9e7c93e2666a3ce08fc2b62f19956eb6814170660418301e942fe4a4 T2-dev-24.json
+7859a2963d05faa0bbb28ed034c21c52adc8cb64a3112692e2945523c55f6a30 T2-dev-24.png
+ed0681e5ad8ee852789c2a90227ceebbdc2b7eb25d4a5673b26124b7c3663ae2 T2-dev-24_main.png
+c426ad600689e07c620fc29c5b12db39b069c997dbe04b5e839e9e9edea1d8e7 T2-dev-24_top.png
+f95ff1ad8e6a94b29cbc52d75ff6c3732ecc60b0567324775da09619133a3e86 T2-dev-24_robot_side.png
+9dcfe1775de6731f67de18b1e941f540c264245cab6d91ddaa588468959c567e T2-dev-24_left_side.png
+31f51e74db792fdeb6a7f1f32b1b1443aa7b4af18af27c7700605e3a70bd45a9 T2-dev-24_multiview.png
+233f2407523c14243414e2419cd07bb0ff28d83ee7c07e3c85916074f4b08225 T2-dev-25.json
+694d2304439f08d47301a77d7f5dc5de1dcf733f0c03c2c3b4ec1bf04f4db8dd T2-dev-25.png
+0d7fe635b083b2ede0ac23739feea76cff51828ca6ae7f5b903cd2044fe3f252 T2-dev-25_main.png
+8e75354f985f5c78f28e494cc30d30e4df86ce7a6c5e3f60e994366ba4311542 T2-dev-25_top.png
+5f96953fd3e42b629337080083fd97265dfff581b80b142b01b5588f18872963 T2-dev-25_robot_side.png
+17c6d543704d0175786fafa583da1818c183372ab38393061ddf005dbbeccceb T2-dev-25_left_side.png
+706cd56e2b190cd5ca702ef26ea1a44498e685a235e4764200af7e396993a36c T2-dev-25_multiview.png
+c490b7c2c668017a32470207facee1acfd50e2d54dab7b00e2ef89acbda2bef4 T2-dev-26.json
+6d23a08405f9a9a226eabf80d3045f2ccc7b8fbcef05c9a9045880caadb32ec7 T2-dev-26.png
+8617e3d197cf9a87da19a1f96d9042f70bbcab7743263a6ecb37f50673bb595d T2-dev-26_main.png
+0cc360f789e16ae2ed80d20813384a65b4910ef7f83d007e6855d30bec51c8d8 T2-dev-26_top.png
+e7a23a8bb4762ece4c7e30db5aaae9e21951fad9b52ed7c31883b1ac6316ea2e T2-dev-26_robot_side.png
+16b09436272e655eb53162516562b9fd3bdc73ec1ea47f96e5278398f088c884 T2-dev-26_left_side.png
+f33342d69e9437f47c0abf438408b85aa9d5be0a4639a90de08fbcd42d0fe9ac T2-dev-26_multiview.png
+30815d5a51ae09fca6792c484d181cbcadef089ec70461efc71dc9faaeba235e T2-dev-28.json
+9e84498b8cb97e30896cb5caa2fea1796e6c1dbac0c29bad8c23d7dd530ef79a T2-dev-28.png
+8cf7c78160ba34671960aa82e933a5cf0652898e69f8ac57ef13b3a553fe7011 T2-dev-28_main.png
+f819125274fb14cd449b4636e0fde7bf0d6f446c409420106a194fe8b58fef17 T2-dev-28_top.png
+3a1d7e09257668f949404c97488d4c24a12ef15dca13c2a99ef2346e33f04293 T2-dev-28_robot_side.png
+cef79732bd0bfe75e82dbdcbeb7bd29d6ae48c7f4b2033d5255783178b50f357 T2-dev-28_left_side.png
+e0e9809e358b83a471db3a16759de162f2d1560db4ee07082d1e64e9085b1b63 T2-dev-28_multiview.png
+6caa271dbf06f1a843d1c142e5a309bec6d084e4bd3727e86fb6cb3b6a26075a T3-dev-40.json
+0991c66673d5244f17add47e0a42edff0ab43ef02360daf662682e80a45b5b6c T3-dev-40.png
+0acb6aafa031f3e084e390870d74d5f0e0c19b7fb5346ab07fc981e2c1dc1d23 T3-dev-40_main.png
+0c968d2f23f88ec932c2175607d3dfcb3be37ab743101103106fecc161918a8f T3-dev-40_top.png
+1d8d289b70e9fe07f7e44795d23aa22e96fb1ed9a92330b39324466f944eac47 T3-dev-40_robot_side.png
+0d80623477f89d4ca143c9fd0e2c349afea3e7da5dd18b7b44443b1e79c8f95f T3-dev-40_left_side.png
+d0b3f205c35025f176c6e35ccee2f494783998cc1e2d38161315690cad2a3cd8 T3-dev-40_multiview.png
+9f1e82be1cd970b088b86e07f29d6ee62bd5e68e8078a9e9cdc229b5aecc2312 T3-dev-42.json
+309d2651d7828d91ed7b3cceca9e9c4bccec25ac078e89ed811efa567c50bc9a T3-dev-42.png
+44a4f0e0edd593ea31da7a578c4462ac415899c9ec79b2acb67b85bea931fa9a T3-dev-42_main.png
+fd2515fe13ec080f359fe06c79727b2fd7a8b80fedbdaee61c3cdf707ba5ad36 T3-dev-42_top.png
+0b904332bef2cd8d9897e7714a3b08684cbafb5e92fa7151298e9911a032b5fd T3-dev-42_robot_side.png
+b71f985b592a27939bc885e8446fbda834624f93c685d153e4c68e097a8551e9 T3-dev-42_left_side.png
+d1dd459f533a84f0d56c98b3e9c14c3e5536c9e6dd4fdc7084f09de685054f3e T3-dev-42_multiview.png
+5d0023b7725d1fb137039c01cddef8162f4bb4bd3a01fa9a96966d09ac36ba11 T3-dev-43.json
+40c1d64c892a967b0a750d4f99035eb25bbf90293c33fda0147f46d8b28cc4e9 T3-dev-43.png
+26302a613e764698478ebe8c613590dec1913f423041ff351206c632ffecd38a T3-dev-43_main.png
+bbf291fcd3fba44926331be4c7825fabd1ca9f4d0b8cb1bb54985e19bc4c5ca2 T3-dev-43_top.png
+b60d9e0875094593421e3871ed0dae01f8db2bd69d6c8b43e4ca82e2f9014db4 T3-dev-43_robot_side.png
+a34c069717cc9b80c4fc583552684d2f0f60af5a1c1768b86d12a1f0c8cc3858 T3-dev-43_left_side.png
+3f326b8c31b04ecd46999b7b8ddedef32f55a5ff66e2592dca1d4ec201c5d62b T3-dev-43_multiview.png
+c42366f2f206efd93561b77ad02fae31645359e80fb1f8f90ab8208b03f6be04 T3-dev-44.json
+2cd6cdff0005ed1a526f8c7344168b7b134c5fbf83e27d7d2d303d0ee6651f4f T3-dev-44.png
+c9b3e5cfd6b1ff233b572698210a60fcc9d81dbd80e209c4c85ce259389b3175 T3-dev-44_main.png
+ff62fafb8833e3d140b7187bb997c78c30262908ed2409a26934ca1f04f3acdf T3-dev-44_top.png
+6eec26e0527c1bdf5eac35ea63bc8fdfe1c17341f27da8bc8b21c2d6cd812549 T3-dev-44_robot_side.png
+21109603a4b5d3363f479d3e074cdee3bdfad9f2ce2f32e8e178a263acd052f4 T3-dev-44_left_side.png
+5db3cf26c9b71efd73a4843fba98bb7e61232deb07520be449829e0b0ffca8aa T3-dev-44_multiview.png (relevance: H-019 S6 step h1: this is the reference for checks h2, h3 and h4. Under amendment A1, a mismatch at h4 VOIDS that batch (V3); a mismatch at h2 or h3 blocks the batch from starting. Follows on from E-010, which found no runs on any of the 12 ids and flagged h1 as outstanding.)
+- **E-012** H-019 dated note S6 (method_designer, 2026-10-04) + PI task message for X-051 (2026-10-04); scenes/dev/ at lab-v1 git 319a838eea7690df156cc7ddfb1a8fadacd316a0: H-019 S6 generator seeds for the 8 closed-set confirmatory scenes (T2-dev-24, T2-dev-25, T2-dev-26, T2-dev-28, T3-dev-40, T3-dev-42, T3-dev-43, T3-dev-44): 57024, 57025, 57026, 57028, 57040, 57042, 57043, 57044. The suffixes suggest the mapping 57024->T2-dev-24, 57025->T2-dev-25, 57026->T2-dev-26, 57028->T2-dev-28, 57040->T3-dev-40, 57042->T3-dev-42, 57043->T3-dev-43, 57044->T3-dev-44. The analyst has NOT checked this mapping against the seed field in each scene JSON (analyst shell is denied). It is filed as the PI supplied it. (relevance: Completes the H-019 S6 h1 record. E-011 filed the 56 hashes but explicitly omitted these seeds. Provenance for the X-051 confirmatory set.)
+- **E-013** lab-v1 git 319a838eea7690df156cc7ddfb1a8fadacd316a0 (X-051 frozen commit); X-051 feasibility field; PI report 2026-10-04: H-019 S6 step h2 (hashes at freeze): the 56 confirmatory scene files under scenes/dev/ at frozen commit 319a838 MATCH the h1 reference E-011, all 56 identical. This was REPORTED BY THE PI and recorded in X-051 as 'not re-verified by the planner'. The analyst has not recomputed it either (shell denied by policy). Corroborating, not independent: every one of the 32 confirmatory episodes in R-094 (v47) and R-096 (v0) logged per-episode scene_files_sha256 (P1). For all 7 files of each of the 8 ids, those logged values equal E-011, compared string by string in the run logs. h3 (before each batch) was not separately filed. h4 (on-disk rehash after each batch, V3(a)) is OUTSTANDING and must be done by the engineer. (relevance: Required by H-019 S6/A1/P2: h2 is the V3 reference. With h2 = E-011, the per-episode check V3(b,c) passes for both batches. V3(a) is still pending.)
+- **E-014** Engineer read-only h4 audit, 2026-10-04, at lab-v1 git 319a838eea7690df156cc7ddfb1a8fadacd316a0 (clean); runs/1791097883_v47_vlm_anchor (R-094), runs/1791099094_v0 (R-096); reference E-011: H-019 h4 (V3(a)) plus V1 re-check, from the engineer's read-only audit after both primary batches.
+- V1: R-094 and R-096 are both at git_head 319a838, fingerprint 548aeccd…dac725 and workspace_sha256 933ec5c4…198b70. MATCH.
+- V3(a): all 56 confirmatory scene files on disk (8 ids x 7 files) match E-011, which is the h1 reference and equals h2 per E-013. MATCH.
+- V3(b,c): all 32 confirmatory episodes (16 per run) logged all 7 scene hashes; 0 missing, 0 mismatches.
+- lab-v1 is still at 319a838 and the tree is clean.
+The engineer ran this audit; the analyst did not recompute it. It agrees with the analyst's own string comparison of the logged hashes in RS-024. (relevance: Closes the only open void check for X-051 under H-019 R2/A1/P2/Q1. No batch is void, so the conditional SUPPORTED verdict in RS-024 becomes unconditional.)
+- **E-015** Independent human check, 2026-10-04: sha256 of scenes/dev on disk (lab-v1 working tree, HEAD 319a838eea7690df156cc7ddfb1a8fadacd316a0); links H-019, E-011, E-013, E-014, RS-024, RS-025: Independent check by the human: sha256 recomputed for all 56 confirmatory scene files on disk; all 56 match the h1 baseline in E-011 exactly. CORRECTION to E-013's wording: these files are NOT in git at commit 319a838 (175 scene files under scenes/dev are untracked), so 'match at frozen commit' is inaccurate. Scene integrity for X-051 rests on the per-episode scene_files_sha256 logs (E-014: 32/32 episodes, 0 mismatches) and on the disk hashes, which are consistent. (relevance: Independent confirmation of H-019 h4 / V3(a) (E-011 baseline; consistent with E-014). Corrects E-013's 'at frozen commit' wording: the scene files are untracked, so they are not covered by git or by the run fingerprint. Applies to the void checks cited in RS-024 and RS-025 for H-019.)
+- **E-016** lab record: query_record(kind=run) + get_object R-001..R-096 (R-097 absent), checked 2026-10-04: H-020 / X-049 PRE-RUN SEED GATE: PASS, no collisions. No prior run, by any method, used any (scene, seed) pair in the H-020 block: T0-dev-01..06 x seeds 400..447 (T0-dev-k: 400+8(k-1)..407+8(k-1)) and T1-dev-01..12 x seeds 500..547 (T1-dev-j: 500+4(j-1)..503+4(j-1)). The +1000 shift is NOT triggered; the primary block stays 400..447 / 500..547. The +1000 fallback block (1400..1447 / 1500..1547) is also clean, so it remains available if needed. (relevance: Clears the H-020 (X-049) pre-run seed gate, which H-020 requires before any episode: "the analyst confirms by query_record that no prior run used any of these (scene, seed) pairs. On any collision, the whole block shifts by +1000."
+
+METHOD
+(1) Substring probes on the compact run JSON.
+- Pair form `", NNN`: prefixes 40-44, 50-54; exact 1400-1447 and 1500-1547.
+- Seed-list forms `, NNN` and `[NNN`: same values.
+- All came back empty.
+- Positive control: `", 15` matched R-095 ["T0-dev-04", 15].
+- The `, 140`..`, 144` hits were R-092's 3-digit seeds 140-144, not 14xx.
+(2) Pairless older runs (R-001..R-075, plus R-077 with pairs=null) store `seeds` as an inclusive [lo, hi] range. Examples: R-031 [1,3] with 3 episodes; R-075 [15,15] with 1 episode. A wide range could hide 400+ without the literal appearing, so every run R-001..R-096 was fetched by get_object and its range and pairs were read directly.
+- Max hi in pairless runs = 7 (e.g. R-002..R-018 [0,7]).
+- Episodes = scenes x range width in every case.
+
+SCOPE / LIMITS
+- Only the run record was checked.
+- Episodes that were never logged as runs are not covered: ad-hoc render_rollout, the planned seed-9999 smoke episodes, and anything outside the record.
+- The gate must be re-run (or the record diffed) if any run is added between now and the X-049 freeze.)
+- **E-017** lab record: get_object R-097..R-100 + query_record(kind=run) newest-first, checked 2026-10-04; builds on E-016 (R-001..R-096): H-020 CONFIRMATORY-BLOCK SEED GATE (re-check after R-097): PASS, no collisions. No run in the record, by any method, has used any (scene, seed) pair in T0-dev-01..06 x seeds 1400..1447 or T1-dev-01..12 x seeds 1500..1547. This updates E-016. NOTE: the primary block 400..447 / 500..547 is now fully consumed by R-097 (X-055, v6_combo, all 96 pairs, final_eval=false), so it is no longer held out. (relevance: Links: H-020, E-016. H-020 requires the analyst to confirm via query_record, before any confirmatory episode, that no prior run used the block's (scene, seed) pairs.
+
+DELTA SINCE E-016
+- E-016 read every run R-001..R-096 and found a max seed of 147.
+- The only run added since is R-097 (X-055, v6_combo, created 1791103944). R-098, R-099 and R-100 do not exist. R-097 is the newest hit for query_record(kind=run, limit=1).
+- R-097 seeds are exactly 400..447 and 500..547, with 96 explicit pairs (T0-dev-k: 400+8(k-1)..+7; T1-dev-j: 500+4(j-1)..+3). Its max seed is 547, so it touches nothing in 1400..1547.
+- Max seed across the whole record is now 547. No seed >= 548 appears in any run, so the +1000 block is clean.
+
+CONSEQUENCE
+- R-097 used the entire H-020 primary block. Any H-020 confirmatory run must use the +1000 block (1400..1447 / 1500..1547), with the same scene-to-seed mapping shifted by +1000.
+- R-097 (X-055) must not be counted as the H-020 confirmatory result. It was run on the held-out block before the freeze, so it is dev data.
+- The method was developed after the primary block was seen. The +1000 block is therefore the only uncontaminated held-out set.
+
+LIMITS
+- Only the run record was checked. Unlogged episodes are not covered: ad-hoc render_rollout calls, smoke tests, and anything outside the record.
+- Re-run this gate if any run is added before the X-049 freeze.)
+- **E-018** X-058 engineer read-only V1–V4 audit of R-098 + R-099 (git 76cc1a7): X-058 passes H-020 void rules V1–V4.
+- V1: R-098 and R-099 are both at git_head 76cc1a7, fingerprint 0b4bba36…b13b, workspace 432aef91…6506.
+- V2: v6_combo is complete in 96/96 episodes. 144/144 true blocks are matched with e and p present, and there are 0 spurious blocks. support_valid_true is true in 96/96, and walk-end and post-bridge poses are present in 96/96. failure_attribution is null in 92 and walk_drift_absorbed in 4.
+- V3: all 1,344 logged scene hashes (672 per run) match the committed bytes at 76cc1a7, with 0 missing, 0 mismatched and 0 extra.
+- V4: there is exactly 1 prompt_sha256 (d630c678…fe88), and cached=false in 96/96.
+- Pairs: 96 per arm, identical between arms and equal to the pre-registered blocks. (relevance: This lets H-020 reach a verdict. With V1–V4 clean, X-058 is a valid confirmatory test, so the ≥44/48-per-tier pass rule (threshold 5) can be applied to RS-027.)
+- **E-019** lab record: query_record(kind=run) substring probes over R-001..R-099 + get_object R-097, R-098, R-099; builds on E-016 (R-001..R-096 range audit); checked 2026-10-04; for X-061: X-061 PRE-RUN SEED GATE: PASS, no collisions. No run in R-001..R-099 used, by any method, any (scene, seed) pair in the X-061 block: T2-dev-{01,02,03,06,11,12,19,22,24,25,26,28} x seeds 2000..2047, or T3-dev-{01,02,03,05,13,19,21,23,40,42,43,44} x seeds 2100..2147. No seed in 2000..2147 appears anywhere in the run record, either as an explicit seed, as a pair, or inside a [lo, hi] range. (relevance: Clears the seed gate for X-061 (H-020 joint v0 / v2_walk / v6_combo, 96 T2/T3 pairs at 76cc1a7). The block can run as planned; no shift is needed.
+
+METHOD
+(1) Substring probes on the compact run JSON (kind=run, all runs):
+- Pair / seed-list form `", 20` and `", 21`: empty. This covers every pair ["scene", 20xx] / ["scene", 21xx] and every non-first seed-list entry.
+- First-element / range-lo form `[20` and `[21`: empty.
+- Positive control: `", 1547]` matched R-099 and R-098, so the probe sees 4-digit seeds in the newest runs.
+(2) Ranges: a pairless [lo, hi] range could hide 2000..2147 without the literal appearing.
+- R-001..R-096: E-016 fetched every run by get_object. The max hi in pairless runs was 7 and the max seed anywhere was 147.
+- R-097..R-099 were fetched directly and use explicit seeds/pairs only. R-097 (X-055, v6_combo) uses 400..447 / 500..547; R-098 (X-058, v6_combo) and R-099 (X-058, v0) use 1400..1447 / 1500..1547. All of these are T0/T1 scenes.
+- The max seed anywhere in the record is now 1547, below 2000.
+(3) The X-061 scenes have been run before, e.g. R-096 (X-051, v0) on T2-dev-24/25/26/28 and T3-dev-40/42/43/44, but only with seeds 0..1. Those pairs are disjoint from the block.
+
+SCOPE / LIMITS
+- Only the run record was checked. Episodes never logged as runs are not covered: ad-hoc render_rollout, smoke episodes, and anything outside the record.
+- Re-run the gate (or diff runs > R-099) if any run is added before the X-061 freeze.)
+- **E-020** human determinism check on lab-v1 commit 76cc1a7, 2026-10-04 (not recorded as runs); linked to D-008, H-021, H-022, X-061: Human determinism check on the current code (lab-v1 76cc1a7): 8 v2_walk episodes (T0-dev-01..06, unused seeds 3000-3007, not recorded as runs) run serially and then 8-way in parallel gave bit-identical results in 8/8: success, every block error, walk terminal pose. The D-008 Sumo determinism fix holds under parallel load. (relevance: Links: D-008, H-021, H-022, X-061.
+
+- Supports the D-008 Sumo determinism fix at 76cc1a7 under 8-way parallel load. This bears on whether the Sumo arms (v2_walk, v6_combo) in X-061 and in H-021/H-022 can run in parallel rather than serially at max_workers=1.
+- Limit: n = 8 episodes, v2_walk only, T0 scenes only. v6_combo and T2/T3 were not exercised.
+
+SEED HYGIENE: seeds 3000-3007 on T0-dev-01..06 have now been exercised outside the run record. Do NOT use them as fresh / held-out seeds. Seed gates that only query kind=run (e.g. E-016, E-019) cannot see these episodes, so this evidence is the record of their use.)
+- **E-021** lab record runs R-001..R-102 (query_record kind=run; get_object R-100, R-101, R-102, R-103); builds on E-016, E-019, E-020: Seed gate PASS (2026-10-04): no run R-001..R-102 has used seeds 4000-4047 on T2-dev-01/02/03/06/11/12/19/22/24/25/26/28 or seeds 4100-4147 on T3-dev-01/02/03/05/13/19/21/23/40/42/43/44 (96 pairs), with any method. The E-020 out-of-record seeds (3000-3007, T0-dev-01..06) do not overlap: they are T0-only and outside 4000-4147, and no logged run uses any seed from 3000 to 3007. Method: R-001..R-096 used a maximum seed of 147 and range ends of at most 7 (E-016). R-097..R-099 list seeds explicitly and use 400-547 or 1400-1547 on T0/T1 only (E-019). I opened R-100 (X-061 v0), R-101 (X-061 v2_walk) and R-102 (X-061 v6_combo) in full. Each lists seeds explicitly, and they use only 2000-2047 (T2) and 2100-2147 (T3). R-103 does not exist. The largest seed in the record is therefore 2147. Substring probes: '4047', '3007', '", 300', '[300' and '", 2148' returned nothing. '4000', '4100' and '4147' matched only text inside hashes or timestamps in R-092, R-059 and R-102, whose real seeds are 100-147, [12,12] and 2000-2147. '", 40', '", 41' and '[40' matched R-097's 3-digit seeds 400-447. Positive control: '", 2147]' found R-102. (relevance: Clears 4000-4047 (T2) and 4100-4147 (T3) as fresh seeds for the next X-061-style held-out batch. Limits: (1) this covers logged runs only; ad-hoc render_rollout calls and smoke episodes are invisible to it, and E-020 is the only record of seeds 3000-3007; (2) any run added after R-102 means the gate must be re-run; (3) the X-061 seeds 2000-2147 on these scenes are now used up by R-100..R-102 and must not be reused as fresh seeds.)
+- **E-022** X-063 engineer read-only V1-V4 audit of R-103 + R-104 (git 15686c1, fingerprint 1163ff1a…c24e), 2026-10-04, forwarded by PI: X-063 passes H-022 void rules V1-V4 (including the PI's V1 addition: full fingerprint incl. git_head, no commits in the window).
+- V1: R-103 and R-104 both at fingerprint 1163ff1a…c24e, HEAD 15686c1, workspace ea169851…af12. No commit during the arms; lab/, methods/, prompts/ clean.
+- V2: 96/96 v6_combo episodes complete. 360 true blocks: 359 matched, 1 missing, 1 spurious. support_valid_true 95 true + 1 n/a_mismatch. failure_attribution: null 89, walk_drift_absorbed 5, perception_structure 1, placement 1. prompt_sha256 present 96/96.
+- V3: 672/672 scene hashes per run match the 15686c1 blobs.
+- V4: exactly 1 prompt_sha256 (d630c678…); cached=false 96/96.
+- Pairs exactly as pre-registered.
+- Paired 2x2 (both pass / v6 only pass / v0 only pass / both fail): T2 44/2/2/0; T3 47/1/0/0.
+- Failures: T2-dev-11 s4018 perception_structure (white cube read as white brick: b0 missing + spurious brick; walk yaw +15.1 deg); T2-dev-12 s4023 placement (structure matched, b0 lateral residual -5.8 cm, walk clean +1.5 deg). No 'order' class. (relevance: Lets H-022 reach a confirmatory verdict on X-063: V1-V4 clean, so threshold 1 does not fire and the >=44/48-per-tier rule applies. NOT covered by this audit: the 6-worker serial-vs-parallel parity check for v6_combo on T2/T3, full walk-tail quantiles, and the paired block-error difference.)
