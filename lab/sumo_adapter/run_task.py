@@ -106,7 +106,25 @@ def save_video(task, qpos_traj: np.ndarray, path_stem: Path) -> dict:
     gif = Path(f"{path_stem}.gif")
     images = [Image.fromarray(frame) for frame in frames]
     images[0].save(gif, save_all=True, append_images=images[1:], duration=100, loop=0)
-    result = {"gif": str(gif)}
+    sheet = Path(f"{path_stem}.png")
+    columns = 4
+    selected = [
+        frames[index]
+        for index in np.linspace(
+            0, len(frames) - 1, min(12, len(frames)), dtype=int
+        )
+    ]
+    blank = np.zeros_like(selected[0])
+    rows = [
+        np.concatenate(
+            list(selected[i : i + columns])
+            + [blank] * (columns - len(selected[i : i + columns])),
+            axis=1,
+        )
+        for i in range(0, len(selected), columns)
+    ]
+    Image.fromarray(np.concatenate(rows, axis=0)).save(sheet)
+    result = {"gif": str(gif), "contact_sheet": str(sheet)}
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg:
         mp4 = Path(f"{path_stem}.mp4")
@@ -151,6 +169,8 @@ def main():
     ap.add_argument("--episode-length-s", type=float, default=10.0)
     ap.add_argument("--num-rollouts", type=int)
     ap.add_argument("--horizon", type=float)
+    ap.add_argument("--max-opt-iters-per-step", type=int)
+    ap.add_argument("--step-log-path")
     ap.add_argument("--task-config-json")
     ap.add_argument("--settle-phase-s", type=float, default=0.0)
     ap.add_argument("--settle-config-json")
@@ -225,6 +245,11 @@ def main():
                 )
             task.config.object_half_height = float(half_size[2])
             mujoco.mj_setConst(task.sim_model, task.data)
+    # The hierarchical simulator creates native model copies in _create_sim.
+    # H-018 changes proxy geometry after that point, so refresh only its native
+    # systems. Existing tasks retain their original initialization path.
+    if hasattr(task, "weld_eq_id") and hasattr(sim, "_init_cpp_systems"):
+        sim._init_cpp_systems(reg.locomotion_policy_path)
     object_proxy = None
     if all(
         name in {task.sim_model.geom(i).name for i in range(task.sim_model.ngeom)}
@@ -293,6 +318,10 @@ def main():
     ccfg.set_override(a.task)
     if a.horizon:
         ccfg.horizon = a.horizon
+    if a.max_opt_iters_per_step is not None:
+        if a.max_opt_iters_per_step < 1:
+            raise ValueError("--max-opt-iters-per-step must be >= 1")
+        ccfg.max_opt_iters = a.max_opt_iters_per_step
     ctrl = Controller(ccfg, task, opt_cls(ocfg, task.nu), rollout_backend=reg.rollout_backend,
                       rollout_backend_registry={"mujoco_g1": G1RolloutBackend})
     approach_state = dict(vars(task.config))
@@ -316,9 +345,28 @@ def main():
             "walk_end_qvel": None,
         }
         post_sim_step = task.post_sim_step
+        release_refresh_state = {"done": False}
 
         def post_sim_step_with_phase_switch():
             post_sim_step()
+            if (
+                hasattr(task, "release_time_s")
+                and task.release_time_s is not None
+                and not release_refresh_state["done"]
+            ):
+                # eq_active is data state. Native hierarchical systems own
+                # private MjData instances, so rebuild from the model whose
+                # eq_active0 the task switched off at release.
+                if hasattr(sim, "_init_cpp_systems"):
+                    sim._init_cpp_systems(reg.locomotion_policy_path)
+                backend = ctrl.rollout_backend
+                if hasattr(backend, "_setup_mujoco_extensions"):
+                    backend._setup_mujoco_extensions(
+                        task.sim_model,
+                        backend._policy_path,
+                        backend.num_threads,
+                    )
+                release_refresh_state["done"] = True
             if (
                 a.settle_phase_s > 0.0
                 and not phase_state["settle"]
@@ -342,15 +390,104 @@ def main():
         t = time.time()
         planning_wall_s = 0.0
         update_action = ctrl.update_action
+        update_iteration = ctrl._update_iteration
+        planning_rows = []
+        iteration_count = 0
+
+        def counted_update_iteration():
+            nonlocal iteration_count
+            iteration_count += 1
+            return update_iteration()
 
         def timed_update_action():
             nonlocal planning_wall_s
             planning_started = time.perf_counter()
+            before_iterations = iteration_count
             try:
-                return update_action()
+                result = update_action()
             finally:
                 planning_wall_s += time.perf_counter() - planning_started
+            if hasattr(task, "cost_terms"):
+                terms = task.cost_terms(
+                    ctrl.states,
+                    ctrl.sensors,
+                    ctrl.rollout_controls,
+                    ctrl.system_metadata,
+                )
+                best = int(np.argmax(ctrl.rewards))
+                physics = (
+                    task.physics_log[-1]
+                    if getattr(task, "physics_log", None)
+                    else {}
+                )
+                pose = task.data.qpos[
+                    task.object_pose_idx : task.object_pose_idx + 7
+                ]
+                goal = np.array(
+                    [
+                        task.config.goal_x,
+                        task.config.goal_y,
+                        task.config.goal_z,
+                    ]
+                )
+                error = pose[:3] - goal
+                planning_rows.append(
+                    {
+                        "planning_step": len(planning_rows),
+                        "time_s": physics.get("time_s", 0.0),
+                        "samples": int(len(ctrl.rewards)),
+                        "iterations_run": iteration_count
+                        - before_iterations,
+                        "cost_terms": {
+                            name: {
+                                "executed_best": float(values[best]),
+                                "sample_mean": float(np.mean(values)),
+                                "sample_min": float(np.min(values)),
+                            }
+                            for name, values in terms.items()
+                        },
+                        "block_goal_error": {
+                            "xyz_m": error.tolist(),
+                            "position_m": float(np.linalg.norm(error)),
+                            "xy_m": float(np.linalg.norm(error[:2])),
+                            "yaw_deg": float(task._yaw_error_deg(pose[3:7])),
+                        },
+                        "weld_active": physics.get("weld_active"),
+                        "base_xy_displacement_m": physics.get(
+                            "base_xy_displacement_m"
+                        ),
+                        "base_yaw_change_deg": physics.get(
+                            "base_yaw_change_deg"
+                        ),
+                        "robot_block_contacts_since_previous_plan": int(
+                            sum(
+                                row["robot_block_contacts"]
+                                for row in getattr(task, "physics_log", [])
+                                if row["time_s"]
+                                > (
+                                    planning_rows[-1]["time_s"]
+                                    if planning_rows
+                                    else -1.0
+                                )
+                            )
+                        ),
+                        "block_floor_contacts_since_previous_plan": int(
+                            sum(
+                                row["block_floor_contacts"]
+                                for row in getattr(task, "physics_log", [])
+                                if row["time_s"]
+                                > (
+                                    planning_rows[-1]["time_s"]
+                                    if planning_rows
+                                    else -1.0
+                                )
+                            )
+                        ),
+                    }
+                )
+            return result
 
+        ctrl._update_iteration = counted_update_iteration
         ctrl.update_action = timed_update_action
         try:
             ep = run_single_episode(
@@ -358,6 +495,7 @@ def main():
             )
         finally:
             ctrl.update_action = update_action
+            ctrl._update_iteration = update_iteration
             task.post_sim_step = post_sim_step
         final_qpos = np.asarray(task.data.qpos).copy()
         final_qvel = np.asarray(task.data.qvel).copy()
@@ -404,9 +542,54 @@ def main():
                ),
                "mpc_planning_steps": planning_steps,
                "max_opt_iters_per_step": ctrl.controller_cfg.max_opt_iters,
-               "mpc_iterations_completed": planning_steps * ctrl.controller_cfg.max_opt_iters,
+               "mpc_iterations_completed": iteration_count,
                "planning_wall_s": round(planning_wall_s, 3),
                "wall_s": round(time.time() - t, 1)}
+        if hasattr(task, "weld_eq_id"):
+            row.update(
+                {
+                    "object_pose_qpos_index": int(task.object_pose_idx),
+                    "release_time_s": task.release_time_s,
+                    "forced_release": bool(task.forced_release),
+                    "release_reason": task.release_reason,
+                    "error_at_release": task.release_error,
+                    "object_pose_at_release": task.release_pose,
+                    "object_pose_at_release_plus_post_release_s": (
+                        task.release_plus_post_pose
+                    ),
+                    "release_transitions": int(task.release_transitions),
+                    "physics_steps": task.physics_log,
+                    "collision_manifest": task.collision_manifest(),
+                    "runtime_idealization_manifest": (
+                        task.runtime_idealization_manifest()
+                    ),
+                    "planning_steps": planning_rows,
+                }
+            )
+            if task.release_pose is not None:
+                release_gripper_distance = (
+                    task.post_release_block_gripper_distance_m
+                )
+                row["post_release_block_gripper_distance_m"] = (
+                    release_gripper_distance
+                )
+                if release_gripper_distance is not None:
+                    row[
+                        "post_release_block_gripper_distance_growth_m"
+                    ] = (
+                        release_gripper_distance
+                        - float(task.release_block_gripper_distance_m)
+                    )
+        if a.step_log_path:
+            step_log_path = Path(a.step_log_path).resolve()
+            step_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with step_log_path.open("w") as stream:
+                for planning_row in planning_rows:
+                    stream.write(
+                        json.dumps(planning_row, sort_keys=True) + "\n"
+                    )
+            row["step_log_path"] = str(step_log_path)
+            row["step_log_rows"] = len(planning_rows)
         row.update(base_arrival_state(task, final_qpos, final_qvel))
         if a.video_dir and len(ep["qpos_traj"]):
             row["video"] = save_video(
@@ -454,6 +637,7 @@ def main():
                           ),
                       },
                       "controller_horizon_s": ctrl.controller_cfg.horizon,
+                      "max_opt_iters_per_step": ctrl.controller_cfg.max_opt_iters,
                       "backend": type(ctrl.rollout_backend).__name__,
                       "object_proxy": object_proxy,
                       "object_start_pose": object_start_pose,
