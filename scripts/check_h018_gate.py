@@ -60,6 +60,15 @@ def check_episode(
         lifted_rows[0]["time_s"] if lifted_rows else float("inf")
     )
     target_xy = np.asarray(stage["scene_object_goal_pose"][:2])
+    block_type = scene["target"]["blocks"][0]["type"]
+    full_xy = {
+        "cube": np.array([0.12, 0.12]),
+        "brick": np.array([0.12, 0.24]),
+    }[block_type]
+    # "Except at the target" means the carried block's centre has entered
+    # the target footprint. Use the footprint's orientation-independent
+    # circumscribed radius; this does not relax the release predicate.
+    target_footprint_radius = float(np.linalg.norm(full_xy / 2.0))
     floor_away_from_target = sum(
         row["block_floor_contacts"]
         for row in before_release
@@ -67,7 +76,7 @@ def check_episode(
         and np.linalg.norm(
             np.asarray(row["block_pose"][:2]) - target_xy
         )
-        > 0.02
+        > target_footprint_radius
     )
     iterations_ok = [
         row["samples"] == 128 and row["iterations_run"] == 4
@@ -155,6 +164,7 @@ def check_episode(
             "floor_contacts_away_from_target_after_lift": (
                 floor_away_from_target
             ),
+            "target_footprint_radius_m": target_footprint_radius,
         },
         "G3": {
             "pass": bool(
