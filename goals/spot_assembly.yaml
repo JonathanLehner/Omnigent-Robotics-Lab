@@ -19,4 +19,4 @@ de_idealization_ladder:
   - {rung: 5, replaces: oracle structure spec, with: spec parsed from the target image}
 rung_rule: a rung counts only if the method still meets the success target on that rung's dev scenes; the agents may reorder rungs
 success_target: ">= 0.8 success on the tier's dev scenes, CI reported"
-budget: {episodes: 1500, wall_clock_hours: 24}
+budget: {episodes: 2000, wall_clock_hours: 24}
