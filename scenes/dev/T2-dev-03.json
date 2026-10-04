@@ -1,0 +1,89 @@
+{
+ "id": "T2-dev-03",
+ "tier": "T2",
+ "split": "dev",
+ "seed": 1202,
+ "structure": "wall",
+ "target": {
+  "blocks": [
+   {
+    "type": "cube",
+    "pos": [
+     0.0,
+     -0.13,
+     0.05
+    ],
+    "yaw": 0.0,
+    "id": "b0",
+    "color": "red",
+    "on": []
+   },
+   {
+    "type": "cube",
+    "pos": [
+     0.0,
+     0,
+     0.05
+    ],
+    "yaw": 0.0,
+    "id": "b1",
+    "color": "blue",
+    "on": []
+   },
+   {
+    "type": "cube",
+    "pos": [
+     0.0,
+     0.13,
+     0.05
+    ],
+    "yaw": 0.0,
+    "id": "b2",
+    "color": "green",
+    "on": []
+   }
+  ]
+ },
+ "oracle_order": [
+  "b0",
+  "b1",
+  "b2"
+ ],
+ "start": [
+  {
+   "id": "b0",
+   "pos": [
+    0.608269675870578,
+    -0.21206846479299638,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b1",
+   "pos": [
+    0.4624445697561741,
+    -0.4166226574225701,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b2",
+   "pos": [
+    0.5981941702587895,
+    0.23197232861016867,
+    0.05
+   ],
+   "yaw": 0.0
+  }
+ ],
+ "image": "scenes/dev/T2-dev-03.png",
+ "image_views": {
+  "main": "scenes/dev/T2-dev-03_main.png",
+  "top": "scenes/dev/T2-dev-03_top.png",
+  "robot side": "scenes/dev/T2-dev-03_robot_side.png",
+  "left side": "scenes/dev/T2-dev-03_left_side.png"
+ },
+ "image_multiview": "scenes/dev/T2-dev-03_multiview.png"
+}

@@ -1,0 +1,30 @@
+# Rung 2: Sumo MPC commands Relic to walk from 1.5 m away to the build-site standoff,
+# then the v0 scripted weld placement runs in the assembly world.
+name: v2_walk
+rung: 2
+idealizations:
+  - oracle_structure_spec
+  - oracle_build_order
+  - weld_grasp
+  - scripted_arm
+  - no_arm_block_collision
+  - sumo_to_assembly_state_bridge
+arm_block_collision: false
+stages:
+  perceive: oracle
+  plan_order: oracle
+  build: sumo_walk_then_scripted_weld
+sumo:
+  task: spot_walk_approach
+  task_module: lab/sumo_tasks/spot_walk_approach.py
+  policy: Relic
+  optimizer: cem
+  num_rollouts: 24
+  episode_length_s: 4.0
+  walk_starts: varied_v1
+  timeout_s: 600
+  approach_tolerance_m: 0.25
+params:
+  segment_s: 1.0
+  place_clearance_m: 0.005
+  carry_height_m: 0.15

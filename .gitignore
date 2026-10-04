@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+runs/
+record/lab.db*
+record/model_cache/
+record/budget.json
+*.egg-info/
+.codex-tmp/
+gate0/

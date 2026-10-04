@@ -1,0 +1,38 @@
+# H-016 candidate A: terminal XY precision and near-goal stopping cost.
+name: v2_walk_xy
+rung: 2
+idealizations:
+  - oracle_structure_spec
+  - oracle_build_order
+  - weld_grasp
+  - scripted_arm
+  - no_arm_block_collision
+  - sumo_to_assembly_state_bridge
+arm_block_collision: false
+stages:
+  perceive: oracle
+  plan_order: oracle
+  build: sumo_walk_then_scripted_weld
+sumo:
+  task: spot_walk_approach_xy
+  task_module: lab/sumo_tasks/spot_walk_approach_xy.py
+  policy: Relic
+  optimizer: cem
+  num_rollouts: 24
+  episode_length_s: 4.0
+  timeout_s: 600
+  approach_tolerance_m: 0.25
+  walk_starts: varied_v1
+  task_config:
+    w_position: 160.0
+    w_heading: 160.0
+    w_controls: 0.2
+    w_terminal_xy: 400.0
+    terminal_fraction: 0.25
+    w_base_speed: 10.0
+    base_speed_cap: 0.0
+    base_speed_radius: 0.10
+params:
+  segment_s: 1.0
+  place_clearance_m: 0.005
+  carry_height_m: 0.15

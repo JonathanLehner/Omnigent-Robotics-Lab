@@ -1,0 +1,6 @@
+{"type": "object", "additionalProperties": false, "required": ["failure_visible", "phase", "blocks", "cause"],
+ "properties": {
+  "failure_visible": {"type": "boolean"},
+  "phase": {"type": "string", "enum": ["none", "approach", "grasp", "carry", "place", "release", "after_release"]},
+  "blocks": {"type": "array", "items": {"type": "string"}},
+  "cause": {"type": "string"}}}

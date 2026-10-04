@@ -1,0 +1,92 @@
+{
+ "id": "T2-ho-01",
+ "tier": "T2",
+ "split": "heldout",
+ "seed": 9200,
+ "structure": "bridge",
+ "target": {
+  "blocks": [
+   {
+    "type": "cube",
+    "pos": [
+     0.0,
+     -0.065,
+     0.05
+    ],
+    "yaw": 0.0,
+    "id": "b0",
+    "color": "blue",
+    "on": []
+   },
+   {
+    "type": "cube",
+    "pos": [
+     0.0,
+     0.065,
+     0.05
+    ],
+    "yaw": 0.0,
+    "id": "b1",
+    "color": "orange",
+    "on": []
+   },
+   {
+    "type": "brick",
+    "pos": [
+     0.0,
+     0,
+     0.15000000000000002
+    ],
+    "yaw": 0.0,
+    "id": "b2",
+    "color": "white",
+    "on": [
+     "b0",
+     "b1"
+    ]
+   }
+  ]
+ },
+ "oracle_order": [
+  "b0",
+  "b1",
+  "b2"
+ ],
+ "start": [
+  {
+   "id": "b0",
+   "pos": [
+    0.5648849495723796,
+    0.20305985629191053,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b1",
+   "pos": [
+    0.5188616110965026,
+    -0.2720877049847218,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b2",
+   "pos": [
+    0.5621794609145324,
+    0.4194284199927628,
+    0.05
+   ],
+   "yaw": 0.0
+  }
+ ],
+ "image": "scenes/heldout/T2-ho-01.png",
+ "image_views": {
+  "main": "scenes/heldout/T2-ho-01_main.png",
+  "top": "scenes/heldout/T2-ho-01_top.png",
+  "robot side": "scenes/heldout/T2-ho-01_robot_side.png",
+  "left side": "scenes/heldout/T2-ho-01_left_side.png"
+ },
+ "image_multiview": "scenes/heldout/T2-ho-01_multiview.png"
+}

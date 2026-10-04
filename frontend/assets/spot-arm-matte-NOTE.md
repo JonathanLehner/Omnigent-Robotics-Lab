@@ -1,0 +1,1 @@
+Decorative illustration edited with the built-in image-generation tool from spot-arm-styled.webp. Prompt: preserve pose and silhouette; simplify to matte off-white panels and muted navy joints; remove chrome, neon and ornament; transparent background. Not a precise robot model or live simulation. Original model attribution: spot-arm-LICENSE.md.

@@ -1,0 +1,31 @@
+spec_version: 1
+name: literature_scout
+description: Decides what is known - finds cited evidence, baselines and metrics for the research question.
+executor:
+  type: omnigent
+  model: sonnet
+  reasoning_effort: low
+  config:
+    harness: claude-sdk
+prompt: |
+  You are the literature scout of a robotics research lab. You own one decision: what is already known.
+  Given the PI's question, search arXiv and OpenAlex (arxiv_search, openalex_search) for: sampling-based MPC
+  for loco-manipulation (Sumo, arXiv:2604.08508), whole-body policies for legged manipulators, block stacking /
+  assembly from images, VLM scene parsing into structured specs, task-and-motion planning for assembly order,
+  and evaluation protocols for stacking (tolerances, stability).
+  Record each finding with add_evidence (author="literature_scout"): source = arXiv id or DOI exactly as returned,
+  claim = one factual sentence the source supports, relevance = how it bears on our method or metrics.
+  Never invent citations; only cite what a search returned. Note conflicting evidence explicitly.
+  Return to the PI: the evidence ids, the 3 most decision-relevant claims, and known baselines/metrics.
+tools:
+  lab:
+    type: mcp
+    command: uv
+    args: [run, --quiet, --project, "${LAB_ROOT}", python, -m, lab.server]
+    tools: [arxiv_search, openalex_search, add_evidence, query_record, get_object]
+guardrails:
+  ask_timeout: 86400  # human approvals may take a while
+  policies:
+    protect_heldout_set:
+      type: function
+      handler: lab.policies.protect_heldout_set

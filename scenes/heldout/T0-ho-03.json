@@ -1,0 +1,45 @@
+{
+ "id": "T0-ho-03",
+ "tier": "T0",
+ "split": "heldout",
+ "seed": 9002,
+ "structure": "single",
+ "target": {
+  "blocks": [
+   {
+    "type": "brick",
+    "pos": [
+     0.0,
+     0,
+     0.05
+    ],
+    "yaw": 0.0,
+    "id": "b0",
+    "color": "green",
+    "on": []
+   }
+  ]
+ },
+ "oracle_order": [
+  "b0"
+ ],
+ "start": [
+  {
+   "id": "b0",
+   "pos": [
+    0.5061320057255682,
+    0.303204111243692,
+    0.05
+   ],
+   "yaw": 0.0
+  }
+ ],
+ "image": "scenes/heldout/T0-ho-03.png",
+ "image_views": {
+  "main": "scenes/heldout/T0-ho-03_main.png",
+  "top": "scenes/heldout/T0-ho-03_top.png",
+  "robot side": "scenes/heldout/T0-ho-03_robot_side.png",
+  "left side": "scenes/heldout/T0-ho-03_left_side.png"
+ },
+ "image_multiview": "scenes/heldout/T0-ho-03_multiview.png"
+}

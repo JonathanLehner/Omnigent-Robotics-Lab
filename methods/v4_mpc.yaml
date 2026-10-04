@@ -1,0 +1,42 @@
+# Rung 4: CEM samples Relic whole-body controls against the lab-authored block
+# pose/collision/settle cost. The scene block's geometry, mass, and target pose
+# configure the Sumo proxy; its terminal pose is copied into the lab block.
+name: v4_mpc
+rung: 4
+idealizations:
+  - oracle_structure_spec
+  - oracle_build_order
+  - oracle_block_pose
+  - fixed_base
+  - weld_grasp
+  - no_arm_block_collision
+  - sumo_to_assembly_state_bridge (teleport lab block to Sumo terminal pose, never snap to goal)
+arm_block_collision: false
+stages:
+  perceive: oracle
+  plan_order: oracle
+  build: sumo_mpc_weld_place
+sumo:
+  task: spot_block_mpc_place
+  task_module: lab/sumo_tasks/spot_block_mpc_place.py
+  policy: Relic
+  optimizer: cem
+  num_rollouts: 24
+  # Agent-registered tasks otherwise inherit the generic 1 s controller
+  # horizon instead of Sumo's 2 s Spot override.
+  horizon_s: 2.0
+  # The seeded T0-dev-01 move is 0.472 m; the 6 s smoke covered only 0.262 m.
+  episode_length_s: 10.0
+  timeout_s: 600
+  object_pose_qpos_index: 26
+  # T0-dev-01 direct-smoke default; replaced at runtime with each scene
+  # block's world-frame target pose.
+  object_goal: [0.85, 0.0, 0.05]
+  object_goal_quat: [1.0, 0.0, 0.0, 0.0]
+  cost_terms:
+    - block_pose_error
+    - block_upright
+    - collision_clearance
+    - settle_velocity
+    - angular_velocity
+    - gripper_contact_height

@@ -1,0 +1,20 @@
+[project]
+name = "omnigent-robotics-lab"
+version = "0.1.0"
+description = "Omnigent research lab: Spot builds a structure from a picture"
+requires-python = ">=3.12"
+dependencies = [
+  "mcp>=2.3",
+  "mujoco>=3.6.0,<3.7",
+  "numpy",
+  "pyyaml",
+  "pillow",
+  "robot_descriptions",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["lab*"]

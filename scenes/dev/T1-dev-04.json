@@ -1,0 +1,69 @@
+{
+ "id": "T1-dev-04",
+ "tier": "T1",
+ "split": "dev",
+ "seed": 1103,
+ "structure": "stack",
+ "target": {
+  "blocks": [
+   {
+    "type": "cube",
+    "pos": [
+     0.0,
+     0,
+     0.05
+    ],
+    "yaw": 0.0,
+    "id": "b0",
+    "color": "red",
+    "on": []
+   },
+   {
+    "type": "cube",
+    "pos": [
+     0.0,
+     -0.01628614121923976,
+     0.15000000000000002
+    ],
+    "yaw": 0.0,
+    "id": "b1",
+    "color": "purple",
+    "on": [
+     "b0"
+    ]
+   }
+  ]
+ },
+ "oracle_order": [
+  "b0",
+  "b1"
+ ],
+ "start": [
+  {
+   "id": "b0",
+   "pos": [
+    0.44232989864594463,
+    0.3255538386951055,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b1",
+   "pos": [
+    0.5922770500617728,
+    -0.27923064851739793,
+    0.05
+   ],
+   "yaw": 0.0
+  }
+ ],
+ "image": "scenes/dev/T1-dev-04.png",
+ "image_views": {
+  "main": "scenes/dev/T1-dev-04_main.png",
+  "top": "scenes/dev/T1-dev-04_top.png",
+  "robot side": "scenes/dev/T1-dev-04_robot_side.png",
+  "left side": "scenes/dev/T1-dev-04_left_side.png"
+ },
+ "image_multiview": "scenes/dev/T1-dev-04_multiview.png"
+}

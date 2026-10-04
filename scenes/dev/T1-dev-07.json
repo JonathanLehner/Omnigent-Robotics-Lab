@@ -1,0 +1,79 @@
+{
+ "id": "T1-dev-07",
+ "tier": "T1",
+ "split": "dev",
+ "seed": 1100,
+ "structure": "cube_on_brick",
+ "target": {
+  "blocks": [
+   {
+    "type": "cube",
+    "pos": [
+     0.0,
+     -0.03677360565029584,
+     0.15000000000000002
+    ],
+    "yaw": 0.0,
+    "id": "b0",
+    "color": "green",
+    "on": [
+     "b1"
+    ]
+   },
+   {
+    "type": "brick",
+    "pos": [
+     0.0,
+     0,
+     0.05
+    ],
+    "yaw": 0.0,
+    "id": "b1",
+    "color": "cyan",
+    "on": []
+   }
+  ]
+ },
+ "oracle_order": [
+  "b1",
+  "b0"
+ ],
+ "start": [
+  {
+   "id": "b1",
+   "pos": [
+    0.40125362171383006,
+    -0.3326613603056267,
+    0.05
+   ],
+   "yaw": 0.0
+  },
+  {
+   "id": "b0",
+   "pos": [
+    0.4326057748638872,
+    0.319621237085837,
+    0.05
+   ],
+   "yaw": 0.0
+  }
+ ],
+ "image": "scenes/dev/T1-dev-07.png",
+ "image_views": {
+  "main": "scenes/dev/T1-dev-07_main.png",
+  "top": "scenes/dev/T1-dev-07_top.png",
+  "robot side": "scenes/dev/T1-dev-07_robot_side.png",
+  "left side": "scenes/dev/T1-dev-07_left_side.png"
+ },
+ "image_multiview": "scenes/dev/T1-dev-07_multiview.png",
+ "block_permutation": {
+  "listed_old_ids": [
+   "b1",
+   "b0"
+  ],
+  "id_map": {
+   "b0": "b1",
+   "b1": "b0"
+  }
+ }
+}

@@ -1,0 +1,45 @@
+spec_version: 1
+name: analyst
+description: Decides what results mean - metrics, failure categories, rollout inspection, hypothesis status.
+executor:
+  type: omnigent
+  model: opus
+  reasoning_effort: medium
+  config:
+    harness: claude-sdk
+prompt: |
+  You are the analyst. You own one decision: what the results mean.
+  For the run ids you are given: compute_metrics (pool runs when comparing), compare against the control run
+  (same scenes and seeds), and look at failures: render_rollout for at least one failed episode, then inspect the
+  contact sheet with call_model(model="codex", prompt_path="prompts/analyze_rollout/v1.md", image=<png>).
+  Write log_result (author="analyst"): interpretation with effect size and 95% CIs, failure_analysis by category,
+  which hypotheses it supports/refutes, and anything SURPRISING. Then update hypothesis status with
+  set_hypothesis_status (supported/refuted; reopened when a result contradicts an earlier conclusion).
+  Do not overclaim: with n < 20 per arm say the difference is not resolved. List idealizations still in use.
+  Return the result id, a 3-line summary, and the most informative video as a workspace-file link
+  (e.g. [▶ failure](runs/<dir>/<scene>_s<seed>.gif); the chat blocks inline images) so the PI and the human see it in the web UI. When asked for the final report, call export_record.
+# Workspace = this repo, so the web UI can show runs/*/RUN.md, videos and REPORT.md in this session.
+# Read-only by policy (read_only_workspace): this agent never writes files or runs shell commands.
+os_env:
+  type: caller_process
+  cwd: .
+  sandbox:
+    type: none
+
+tools:
+  lab:
+    type: mcp
+    command: uv
+    args: [run, --quiet, --project, "${LAB_ROOT}", python, -m, lab.server]
+    tools: [compute_metrics, render_rollout, call_model, log_result, set_hypothesis_status, add_evidence,
+            query_record, get_object, export_record]
+    timeout: 1800
+guardrails:
+  ask_timeout: 86400  # human approvals may take a while
+  policies:
+    read_only_workspace:
+      type: function
+      handler: lab.policies.read_only_workspace
+    protect_heldout_set:
+      type: function
+      handler: lab.policies.protect_heldout_set

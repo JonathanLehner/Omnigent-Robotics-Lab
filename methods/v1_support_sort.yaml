@@ -1,0 +1,14 @@
+# Method v1 (rung 1): replaces ONE oracle vs v0 - build order now planned by symbolic_order_planner (support_sort).
+# Hypothesis: H-001.
+name: v1_support_sort
+rung: 1
+idealizations: [oracle_structure_spec, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision]
+arm_block_collision: false
+stages:
+  perceive: oracle
+  plan_order: support_sort
+  build: scripted_weld
+params:
+  segment_s: 1.0
+  place_clearance_m: 0.005
+  carry_height_m: 0.15

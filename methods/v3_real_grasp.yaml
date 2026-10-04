@@ -1,0 +1,22 @@
+# Rung 3: replace weld_grasp with contact forces from the physical fingers on
+# the block handle. Motion planning remains scripted IK.
+name: v3_real_grasp
+rung: 3
+idealizations:
+  - oracle_structure_spec
+  - fixed_base
+  - scripted_arm
+arm_block_collision: true
+stages:
+  perceive: oracle
+  plan_order: support_sort
+  build: scripted_real_grasp
+params:
+  segment_s: 2.5
+  place_clearance_m: 0.008
+  carry_height_m: 0.15
+  grasp_tip_offset_m: [0.02, 0.0, 0.01]
+  grasp_close_command: -0.5
+  grasp_close_dwell_s: 1.0
+  release_dwell_s: 0.5
+  min_transport_m: 0.08

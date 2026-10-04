@@ -1,0 +1,34 @@
+# Rung 3 stack fix. v3_grasp remains the frozen T0 control; this variant adds
+# oracle pose correction and a staged release for supported placements.
+name: v3_grasp_stack
+rung: 3
+idealizations:
+  - oracle_structure_spec
+  - oracle_build_order
+  - oracle_block_pose
+  - fixed_base
+  - scripted_arm
+arm_block_collision: true
+stages:
+  perceive: oracle
+  plan_order: oracle
+  build: scripted_real_grasp_stack
+params:
+  segment_s: 2.5
+  place_clearance_m: 0.004
+  carry_height_m: 0.15
+  grasp_tip_offset_m: [0.015, 0.005, 0.01]
+  handle_friction: [1.0, 0.01, 0.001]
+  grasp_close_command: -0.5
+  grasp_close_dwell_s: 1.0
+  oracle_place_correction: true
+  place_correction_passes: 2
+  place_correction_segment_s: 0.8
+  place_correction_dwell_s: 0.15
+  ramped_release: false
+  grasp_open_command: -1.0
+  release_dwell_s: 0.10
+  vertical_clearance_before_retreat: true
+  release_clear_vector_m: [-0.08, 0.0, 0.03]
+  release_clear_segment_s: 0.7
+  release_final_retreat: false

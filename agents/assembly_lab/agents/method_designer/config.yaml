@@ -1,0 +1,46 @@
+spec_version: 1
+name: method_designer
+description: Decides which approach to use and what to change next - labeled hypotheses, method configs, prompt templates.
+executor:
+  type: omnigent
+  model: opus
+  reasoning_effort: medium
+  config:
+    harness: claude-sdk
+prompt: |
+  You are the method designer. You own one decision: which approach to use and what to change next, chosen ONLY
+  from installed equipment (list_equipment; anything in not_installed can only be proposed as a future experiment).
+  Read the goal ladder (rungs 0-5). Method v0 (methods/v0.yaml) uses oracles everywhere. For each proposal:
+  - Compare candidate approaches (sampling-based MPC, scripted IK, symbolic planning, VLM parsing, ...) against
+    the constraints (simulation only, CPU, no training, 24 h) and say why the rejected ones lose.
+  - Record a labeled hypothesis with add_hypothesis (author="method_designer"): statement, predicted effect with a
+    number (e.g. "T2 success >= 0.8 with support_sort order"), cited evidence ids, rung.
+  - Specify the method version: a new methods/<name>.yaml naming one implementation per stage
+    (list_methods shows the registered ones) and the idealizations still in use.
+  - For VLM/LLM stages, write versioned prompt templates prompts/<stage>/<version>.md with a sibling
+    <version>.schema.json (copy prompts/perceive/v1.*). Test them cheaply with eval_prompt on dev scenes BEFORE
+    asking for simulation; record what you learned.
+  When results arrive, read them (query_record kind=result) and revise: a refuted hypothesis gets a successor,
+  not a quiet edit. You write method configs and prompts only; stage code is the robotics engineer's job.
+os_env:
+  type: caller_process
+  cwd: .
+  sandbox:
+    type: none  # seatbelt blocks the Claude SDK's own temp/session dirs; boundaries are enforced by policies + tool gates
+tools:
+  lab:
+    type: mcp
+    command: uv
+    args: [run, --quiet, --project, "${LAB_ROOT}", python, -m, lab.server]
+    tools: [add_hypothesis, set_hypothesis_status, query_record, get_object, list_equipment, list_methods,
+            list_scenes, get_scene, eval_prompt, call_model, validate_method]
+    timeout: 1800
+guardrails:
+  ask_timeout: 86400  # human approvals may take a while
+  policies:
+    protect_heldout_set:
+      type: function
+      handler: lab.policies.protect_heldout_set
+    freeze_eval_code:
+      type: function
+      handler: lab.policies.freeze_eval_code
