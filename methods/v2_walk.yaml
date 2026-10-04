@@ -10,6 +10,7 @@ idealizations:
   - no_arm_block_collision
   - sumo_to_assembly_state_bridge
 arm_block_collision: false
+max_workers: 6
 stages:
   perceive: oracle
   plan_order: oracle

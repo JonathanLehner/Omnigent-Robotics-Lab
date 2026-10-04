@@ -9,6 +9,7 @@ idealizations:
   - fixed_base
   - scripted_arm
 arm_block_collision: true
+max_workers: 6
 stages:
   perceive: oracle
   plan_order: oracle
