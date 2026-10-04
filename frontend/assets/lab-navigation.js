@@ -1,5 +1,5 @@
 (() => {
- const screens = new Set(['workspace','research','team']);
+ const screens = new Set(['workspace','demos','research','team']);
  const stages = [
   ['Principal investigator', 'Choosing direction and setting the budget'],
   ['Literature scout', 'Finding relevant research and evidence'],
@@ -12,7 +12,7 @@
  const dialog = document.createElement('dialog');
  dialog.className = 'workflow-loading';
  dialog.setAttribute('aria-labelledby','workflow-title');
- dialog.innerHTML = '<div class="workflow-terminal"><div class="terminal-chrome" aria-hidden="true"><span class="terminal-new">＋</span><span class="terminal-app-title">opal labs</span><span class="terminal-window-icons"><i>⌕</i><i>☰</i><i>−</i><i>□</i><i>×</i></span></div><div class="terminal-tab" aria-hidden="true">research@opal-labs: ~/robotics-lab <span>×</span></div><div class="workflow-boot-brand">OPAL LABS / RESEARCH OS</div><div class="workflow-heading"><span class="workflow-spinner" aria-hidden="true"></span><h2 id="workflow-title">what would you like to research?</h2></div><p class="workflow-caption">Demo preview · how the agents work together</p><div class="terminal-command"><span>opal&gt;</span><p>Can a simulated robot assemble a structure from a reference picture without task-specific training?</p></div><ol class="workflow-steps"></ol><div class="workflow-bottom"><span class="workflow-status" role="status" aria-live="polite"></span></div></div>';
+ dialog.innerHTML = '<div class="workflow-terminal"><div class="terminal-chrome" aria-hidden="true"><span class="terminal-new">＋</span><span class="terminal-app-title">opal labs</span><span class="terminal-window-icons"><i>⌕</i><i>☰</i><i>−</i><i>□</i><i>×</i></span></div><div class="terminal-tab" aria-hidden="true">research@opal-labs: ~/robotics-lab <span>×</span></div><div class="workflow-boot-brand">OPAL LABS / RESEARCH OS</div><div class="workflow-heading"><span class="workflow-spinner" aria-hidden="true"></span><h2 id="workflow-title">what would you like to research?</h2></div><div class="terminal-command"><span>opal&gt;</span><p>Can a simulated robot assemble a structure from a reference picture without task-specific training?</p></div><ol class="workflow-steps"></ol><div class="workflow-bottom"><span class="workflow-status" role="status" aria-live="polite"></span></div></div>';
  const list = dialog.querySelector('ol');
  stages.forEach(([name,description]) => {
   const row = document.createElement('li');
@@ -36,8 +36,10 @@
  }
  function show(screen, updateHistory = true) {
   cancelPreview();
+  document.querySelectorAll('#demos video').forEach(video => video.pause());
   const next = screens.has(screen) ? screen : 'home';
   document.body.dataset.screen = next;
+  window.dispatchEvent(new CustomEvent("opal:screen-change", {detail: {screen: next}}));
   document.querySelector('main').scrollTop = 0;
   document.querySelectorAll('.lab-nav a').forEach(link => {
    if (link.hash === '#' + next) link.setAttribute('aria-current','page');
