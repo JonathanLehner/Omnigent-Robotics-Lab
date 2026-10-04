@@ -6,3 +6,4 @@ record/model_cache/
 record/budget.json
 *.egg-info/
 .codex-tmp/
+gate0/

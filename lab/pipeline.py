@@ -208,7 +208,15 @@ def _observe_pre_release_poses(world):
 
 def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None = None) -> dict:
     rng = np.random.default_rng(seed)
-    log = {"scene": scene["id"], "tier": scene["tier"], "seed": seed, "method": cfg["name"], "failures": [], "stages": []}
+    log = {
+        "scene": scene["id"],
+        "tier": scene["tier"],
+        "seed": seed,
+        "method": cfg["name"],
+        "scene_files_sha256": dict(scene.get("_loaded_scene_files_sha256", {})),
+        "failures": [],
+        "stages": [],
+    }
     start = {s["id"]: s for s in scene["start"]}
     blocks = [scenes.to_world(b, pos=np.asarray(start[b["id"]]["pos"]) - sim.SITE + [*rng.uniform(-0.02, 0.02, 2), 0],
                               yaw=float(rng.uniform(-3, 3)))
@@ -223,6 +231,15 @@ def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None =
         spec, order = [], []
     pairs, fails = _match(spec, scene)
     log["failures"] += fails
+    anchored_telemetry = (
+        log.get("perceive", {}).get("telemetry_schema") == "v47_anchor_v1"
+    )
+    if anchored_telemetry:
+        from lab.stages import vlm_anchor_telemetry
+
+        vlm_anchor_telemetry.attach_position_errors(
+            log["perceive"], spec, scene, pairs
+        )
     pictures = {}
     if frame_every_s:  # videos show the target: ghost blocks at the site + the picture Spot was given
         views = scene.get("image_views", {})
@@ -250,6 +267,17 @@ def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None =
         })
     log["blocks"] = per_block
     log["success"] = metrics.episode_success(per_block)
+    if anchored_telemetry:
+        vlm_anchor_telemetry.attach_placement_residuals(
+            log["perceive"], per_block, spec, pairs
+        )
+        if (
+            not log["success"]
+            and vlm_anchor_telemetry.has_localization_failure(
+                log["perceive"], per_block
+            )
+        ):
+            log["failures"].append("perception_localization")
     if not log["success"] and not log["failures"]:
         log["failures"].append("placement_error")
     log["sim_time_s"] = float(world.d.time)

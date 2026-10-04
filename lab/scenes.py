@@ -4,6 +4,7 @@ Structure spec (structure frame = build site on the ground, origin at the center
   {"blocks": [{"id", "type": cube|brick, "color", "pos": [x, y, z], "yaw": deg, "on": [ids it rests on]}]}
 """
 
+import hashlib
 import json
 from copy import deepcopy
 from pathlib import Path
@@ -221,7 +222,24 @@ def load_scene(scene_id: str) -> dict:
     for split in ("dev", "heldout"):
         f = SCENES / split / f"{scene_id}.json"
         if f.exists():
-            return json.loads(f.read_text())
+            spec_bytes = f.read_bytes()
+            scene = json.loads(spec_bytes)
+            hashes = {
+                str(f.relative_to(ROOT)): hashlib.sha256(spec_bytes).hexdigest()
+            }
+            picture_paths = {
+                scene["image"],
+                scene.get("image_multiview"),
+                *(scene.get("image_views") or {}).values(),
+            }
+            for relative in sorted(path for path in picture_paths if path):
+                picture_bytes = (ROOT / relative).read_bytes()
+                hashes[relative] = hashlib.sha256(picture_bytes).hexdigest()
+            # This private loader metadata is copied into the episode record by
+            # the shared runner path. Digests are computed from the byte buffers
+            # above, never by re-reading files after an episode.
+            scene["_loaded_scene_files_sha256"] = hashes
+            return scene
     raise FileNotFoundError(f"no scene {scene_id!r}")
 
 

@@ -8,6 +8,7 @@ test completes. Episodes run in parallel processes (one per core, capped).
 import hashlib
 import json
 import os
+import copy
 import subprocess
 import time
 import traceback
@@ -26,6 +27,7 @@ FROZEN = ROOT / "record" / "frozen_eval.sha256"
 BUDGET = record.DB_PATH.parent / "budget.json"  # per record, so the single-agent baseline has its own
 MAX_WORKERS = max(1, min(8, (os.cpu_count() or 2) - 2))
 SUMO_ENV = Path.home() / "src" / "sumo" / ".pixi" / "envs" / "default"
+METHOD_ARM_CAPS = {"v47_vlm_anchor": 40, "v0": 16}
 
 
 def eval_hash() -> str:
@@ -191,6 +193,7 @@ def _episode(args):
         ep = pipeline.run_episode(scene, cfg, seed, frame_every_s=VIDEO_FRAME_S if video_dir and keep_video else None)
     except Exception:  # noqa: BLE001 - a crash is a recorded failure, not a lost batch
         ep = {"scene": scene["id"], "tier": scene["tier"], "seed": seed, "success": False, "blocks": [],
+              "scene_files_sha256": dict(scene.get("_loaded_scene_files_sha256", {})),
               "failures": ["crash"], "error": traceback.format_exc()[-1500:]}
     frames = ep.pop("_frames", None)
     if frames:
@@ -262,6 +265,21 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
                                           for i in range(episodes_per_scene)}
     # Count episodes, not just unique pairs: a repeated batch (same pairs again) must not slip past the plan.
     episodes_so_far = sum(int(r["data"]["episodes"]) for r in prior)
+    method_episodes_so_far = sum(
+        int(r["data"]["episodes"])
+        for r in prior
+        if r["data"]["method"] == method
+    )
+    if (
+        not final_eval
+        and method in METHOD_ARM_CAPS
+        and method_episodes_so_far + n > METHOD_ARM_CAPS[method]
+    ):
+        raise RuntimeError(
+            f"experiment {experiment_id} caps method {method} at "
+            f"{METHOD_ARM_CAPS[method]} episodes; {method_episodes_so_far} already "
+            f"run, {n} more requested"
+        )
     if not final_eval and episodes_so_far + n > int(exp["data"]["episodes"]):
         raise RuntimeError(f"experiment {experiment_id} planned {exp['data']['episodes']} episodes in total; "
                            f"{episodes_so_far} already run (all arms), {n} more requested. "
@@ -337,6 +355,17 @@ def render_rollout(run_id: str, scene_id: str, seed: int, every_s: float = 1.0) 
     if scene["split"] == "heldout" and not run["data"].get("final_eval"):
         raise RuntimeError("held-out scenes can only be rendered for the final evaluation run")
     cfg = yaml.safe_load((ROOT / run["data"]["results_path"] / "method.yaml").read_text())
+    episode_path = ROOT / run["data"]["results_path"] / "episodes.jsonl"
+    logged = None
+    for line in episode_path.read_text().splitlines():
+        row = json.loads(line)
+        if row["scene"] == scene_id and int(row["seed"]) == int(seed):
+            logged = row
+            break
+    if logged and logged.get("perceive", {}).get("parsed_blocks"):
+        cfg = copy.deepcopy(cfg)
+        cfg["stages"]["perceive"] = "logged_parse"
+        cfg["perceive"]["logged_blocks"] = logged["perceive"]["parsed_blocks"]
     ep = pipeline.run_episode(scene, cfg, seed, frame_every_s=every_s)
     frames = ep.pop("_frames")
     out = ROOT / run["data"]["results_path"] / f"rollout_{scene_id}_s{seed}"
