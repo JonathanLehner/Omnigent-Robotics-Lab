@@ -1,0 +1,52 @@
+name: v6_combo_v47b
+rung: 5
+idealizations:
+  - oracle_block_pose
+  - weld_grasp
+  - scripted_arm
+  - no_arm_block_collision
+  - sumo_to_assembly_state_bridge
+  - fixed_nominal_walk_start
+  - clean_distinct_colour_renders
+  - x_zero
+  - yaw_zero
+  - z_from_layer
+  - known_target_camera
+arm_block_collision: false
+max_workers: 6
+stages:
+  perceive: vlm_measure_anchored_type_override
+  plan_order: support_sort
+  build: sumo_walk_then_closed_loop_weld_place
+perceive:
+  model: codex
+  prompt: prompts/perceive/v2.md
+  cache_mode: fresh_per_seed
+  cached: false
+  type_override:
+    nominal_cube_edge_m: 0.12
+    nominal_brick_length_m: 0.24
+    cube_band_fraction: 0.25
+    brick_band_fraction: 0.75
+sumo:
+  task: spot_walk_approach
+  task_module: lab/sumo_tasks/spot_walk_approach.py
+  policy: Relic
+  optimizer: cem
+  num_rollouts: 24
+  episode_length_s: 4.0
+  walk_starts: varied_v1
+  timeout_s: 600
+  approach_tolerance_m: 0.25
+params:
+  segment_s: 1.0
+  place_clearance_m: 0.005
+  carry_height_m: 0.15
+  place_correction_passes: 2
+  place_correction_segment_s: 0.6
+  place_correction_dwell_s: 0.2
+  place_correction_tolerance_m: 0.001
+  place_correction_max_step_m: 0.04
+telemetry:
+  schema: h020_combo_v1
+  scene_file_count: 7
