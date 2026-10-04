@@ -9,14 +9,27 @@
  document.head.append(style);
  const el=document.createElement('div'); el.className='robot-gripper-cursor';el.setAttribute('aria-hidden','true');el.innerHTML=gripper(0);document.body.append(el);
  let amount=0, target=0, raf=0, last=0;
+ let demoPlayed=false, pointerSeen=false, demoTimers=[];
+ function stopDemo(){demoTimers.forEach(clearTimeout);demoTimers=[];}
  const reduced=matchMedia('(prefers-reduced-motion:reduce)');
  function tick(time){const dt=Math.min(40,time-(last||time));last=time;amount+=(target-amount)*(1-Math.exp(-dt/45));if(Math.abs(target-amount)<.002)amount=target;el.innerHTML=gripper(amount);if(amount!==target)raf=requestAnimationFrame(tick);else{raf=0;last=0;}}
  function setGrip(value){target=value;if(reduced.matches){cancelAnimationFrame(raf);raf=0;amount=target;el.innerHTML=gripper(amount);}else if(!raf)raf=requestAnimationFrame(tick);}
- document.addEventListener('pointermove',e=>{el.style.transform=`translate3d(${e.clientX-3}px,${e.clientY-16}px,0)`;el.style.visibility='visible';document.documentElement.classList.add('gripper-active');},{passive:true});
- document.addEventListener('pointerdown',e=>{if(e.button===0)setGrip(1);});
+ document.addEventListener('pointermove',e=>{pointerSeen=true;el.style.transform=`translate3d(${e.clientX-3}px,${e.clientY-16}px,0)`;el.style.visibility='visible';document.documentElement.classList.add('gripper-active');},{passive:true});
+ document.addEventListener('pointerdown',e=>{if(e.button===0){stopDemo();demoPlayed=true;setGrip(1);}});
  window.addEventListener('pointerup',()=>setGrip(0));
  window.addEventListener('pointercancel',()=>setGrip(0));
- function reset(){setGrip(0);el.style.visibility='hidden';document.documentElement.classList.remove('gripper-active');}
+ function reset(){stopDemo();setGrip(0);el.style.visibility='hidden';document.documentElement.classList.remove('gripper-active');}
+ function loadPinches(){
+  if(demoPlayed || reduced.matches || document.hidden)return;
+  demoPlayed=true;
+  demoTimers.push(setTimeout(() => {
+   if(!pointerSeen){el.style.transform=`translate3d(${innerWidth*.7}px,${innerHeight*.55}px,0)`;el.style.visibility='visible';}
+   [1,0,1,0].forEach((value,i)=>demoTimers.push(setTimeout(()=>setGrip(value),i*330)));
+   demoTimers.push(setTimeout(()=>{demoTimers=[];if(!pointerSeen)el.style.visibility='hidden';},1500));
+  },750));
+ }
+ document.addEventListener('opal:intro-complete',loadPinches,{once:true});
+ if(!document.querySelector('script[src*="opal-intro"]'))loadPinches();
  document.documentElement.addEventListener('pointerleave',reset);
  window.addEventListener('blur',reset);
  document.addEventListener('visibilitychange',()=>{if(document.hidden)reset();});
