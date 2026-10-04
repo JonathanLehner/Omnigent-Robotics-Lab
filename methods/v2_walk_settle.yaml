@@ -30,8 +30,8 @@ sumo:
   settle_phase:
     duration_s: 2.0
     task_config:
-      w_position: 20000.0
-      squared_xy: true
+      w_position: 160.0
+      w_xy_quad: 20000.0
       w_heading: 160.0
       w_base_speed: 50.0
       base_speed_cap: 0.2

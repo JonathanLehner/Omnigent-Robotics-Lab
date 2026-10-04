@@ -74,6 +74,15 @@ def base_arrival_state(task, qpos: np.ndarray, qvel: np.ndarray) -> dict:
     }
 
 
+def effective_cost_weights(config) -> dict:
+    """Return the cost weights actually active on the task config."""
+    return {
+        key: value
+        for key, value in vars(config).items()
+        if key.startswith("w_")
+    }
+
+
 def save_video(task, qpos_traj: np.ndarray, path_stem: Path) -> dict:
     """Render a recorded headless trajectory to GIF and, when available, MP4."""
     import mujoco
@@ -287,6 +296,10 @@ def main():
     ctrl = Controller(ccfg, task, opt_cls(ocfg, task.nu), rollout_backend=reg.rollout_backend,
                       rollout_backend_registry={"mujoco_g1": G1RolloutBackend})
     approach_state = dict(vars(task.config))
+    walk_cost_weights = effective_cost_weights(task.config)
+    apply_task_config(settle_config)
+    settle_cost_weights = effective_cost_weights(task.config)
+    apply_task_config(approach_state)
     cfg = RunMPCConfig(
         init_task=a.task,
         visualize=False,
@@ -297,7 +310,11 @@ def main():
     out = []
     for i in range(a.episodes):
         apply_task_config(approach_state)
-        phase_state = {"settle": False}
+        phase_state = {
+            "settle": False,
+            "walk_end_qpos": None,
+            "walk_end_qvel": None,
+        }
         post_sim_step = task.post_sim_step
 
         def post_sim_step_with_phase_switch():
@@ -307,6 +324,12 @@ def main():
                 and not phase_state["settle"]
                 and task.data.time >= a.episode_length_s
             ):
+                phase_state["walk_end_qpos"] = np.asarray(
+                    task.data.qpos
+                ).copy()
+                phase_state["walk_end_qvel"] = np.asarray(
+                    task.data.qvel
+                ).copy()
                 apply_task_config(settle_config)
                 phase_state["settle"] = True
 
@@ -338,6 +361,19 @@ def main():
             task.post_sim_step = post_sim_step
         final_qpos = np.asarray(task.data.qpos).copy()
         final_qvel = np.asarray(task.data.qvel).copy()
+        walk_end_qpos = phase_state["walk_end_qpos"]
+        walk_end_qvel = phase_state["walk_end_qvel"]
+        if walk_end_qpos is None:
+            walk_end_qpos = final_qpos
+            walk_end_qvel = final_qvel
+        walk_end = base_arrival_state(
+            task, walk_end_qpos.copy(), walk_end_qvel.copy()
+        )
+        post_settle = (
+            base_arrival_state(task, final_qpos.copy(), final_qvel.copy())
+            if phase_state["settle"]
+            else {}
+        )
         sim_dt = task.sim_model.opt.timestep
         plan_dt = 1.0 / ctrl.controller_cfg.control_freq
         num_steps = int(cfg.episode_length_s / sim_dt) + 1
@@ -354,6 +390,18 @@ def main():
                "actual_start_pose": actual_start_pose,
                "settle_phase_s": a.settle_phase_s,
                "settle_phase_applied": phase_state["settle"],
+               "walk_end_base_xy": walk_end.get("terminal_base_xy"),
+               "walk_end_base_yaw_deg": walk_end.get("terminal_base_yaw_deg"),
+               "walk_end_base_speed_m_s": walk_end.get(
+                   "terminal_base_speed_m_s"
+               ),
+               "post_settle_base_xy": post_settle.get("terminal_base_xy"),
+               "post_settle_base_yaw_deg": post_settle.get(
+                   "terminal_base_yaw_deg"
+               ),
+               "post_settle_base_speed_m_s": post_settle.get(
+                   "terminal_base_speed_m_s"
+               ),
                "mpc_planning_steps": planning_steps,
                "max_opt_iters_per_step": ctrl.controller_cfg.max_opt_iters,
                "mpc_iterations_completed": planning_steps * ctrl.controller_cfg.max_opt_iters,
@@ -397,6 +445,14 @@ def main():
                       "task_config": approach_config,
                       "settle_phase_s": a.settle_phase_s,
                       "settle_config": settle_config,
+                      "phase_cost_weights": {
+                          "walk": walk_cost_weights,
+                          "settle": (
+                              settle_cost_weights
+                              if a.settle_phase_s > 0.0
+                              else None
+                          ),
+                      },
                       "controller_horizon_s": ctrl.controller_cfg.horizon,
                       "backend": type(ctrl.rollout_backend).__name__,
                       "object_proxy": object_proxy,

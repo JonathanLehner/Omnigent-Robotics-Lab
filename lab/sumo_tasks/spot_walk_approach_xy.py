@@ -17,6 +17,7 @@ from sumo.tasks import _SPOT_REGISTRATION_KWARGS
 class SpotWalkApproachXYConfig(SpotWalkApproachConfig):
     """Optional XY/stopping costs used by the H-016 candidates."""
 
+    w_xy_quad: float = 0.0
     w_terminal_xy: float = 0.0
     terminal_fraction: float = 0.25
     squared_xy: bool = False
@@ -57,6 +58,7 @@ class SpotWalkApproachXY(SpotWalkApproach):
             position_cost = self.config.w_position * np.sqrt(
                 xy_error_sq
             ).mean(axis=-1)
+        xy_quad_cost = self.config.w_xy_quad * xy_error_sq.mean(axis=-1)
 
         terminal_steps = max(
             1, int(np.ceil(states.shape[-2] * self.config.terminal_fraction))
@@ -94,6 +96,7 @@ class SpotWalkApproachXY(SpotWalkApproach):
         ).any(axis=-1)
         total = (
             -position_cost
+            - xy_quad_cost
             - terminal_cost
             - heading_cost
             - effort_cost

@@ -148,6 +148,7 @@ def _episode(result: dict) -> dict:
         "task_config": result.get("task_config"),
         "settle_phase_s": result.get("settle_phase_s", 0.0),
         "settle_config": result.get("settle_config"),
+        "phase_cost_weights": result.get("phase_cost_weights"),
         "walk_start": result.get("walk_start"),
         "object_proxy": result.get("object_proxy"),
         "object_start_pose": result.get("object_start_pose"),
