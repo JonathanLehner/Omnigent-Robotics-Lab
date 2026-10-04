@@ -395,7 +395,9 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
     # Sumo-based stages are load-sensitive (RS-011: walk outcomes changed under CPU contention), so they run
     # one episode at a time unless the method config or the caller says otherwise.
     sumo = "sumo" in str(g["cfg"]["stages"].get("build", ""))
-    workers = max_workers or g["cfg"].get("max_workers") or (1 if sumo else MAX_WORKERS)
+    # Sumo was load-sensitive until D-008 (fixed rollout horizon, 1-thread Eigen/ONNX, seeded); E-020 showed
+    # serial and 8-way parallel walks are bit-identical, so Sumo methods now default to parallel too.
+    workers = max_workers or g["cfg"].get("max_workers") or (6 if sumo else MAX_WORKERS)
     with ProcessPoolExecutor(workers) as ex:
         eps = list(ex.map(_episode, jobs))
         wall = time.time() - t0
