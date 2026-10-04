@@ -12,6 +12,7 @@ import subprocess
 import time
 import traceback
 from concurrent.futures import ProcessPoolExecutor
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -24,6 +25,7 @@ RUNS = ROOT / "runs"
 FROZEN = ROOT / "record" / "frozen_eval.sha256"
 BUDGET = record.DB_PATH.parent / "budget.json"  # per record, so the single-agent baseline has its own
 MAX_WORKERS = max(1, min(8, (os.cpu_count() or 2) - 2))
+SUMO_ENV = Path.home() / "src" / "sumo" / ".pixi" / "envs" / "default"
 
 
 def eval_hash() -> str:
@@ -49,13 +51,94 @@ def _charge(n):
     BUDGET.write_text(json.dumps({k: b[k] for k in ("episodes_total", "episodes_used")}))
 
 
-def git_version() -> str:
-    def git(*a):
-        return subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
-    head = git("rev-parse", "--short", "HEAD") or "nocommit"
-    diff = git("diff", "HEAD", "--", "lab", "methods", "prompts")
-    return head + (f"+dirty.{hashlib.sha256(diff.encode()).hexdigest()[:8]}" if diff else "")
+
+def _git(*args: str, text: bool = True):
+    return subprocess.run(
+        ["git", *args],
+        cwd=ROOT,
+        capture_output=True,
+        check=False,
+        text=text,
+    ).stdout
+
+
+def _workspace_hash() -> tuple[str, list[str]]:
+    """Hash tracked and untracked method inputs, including deleted-file markers."""
+    raw = _git(
+        "ls-files",
+        "-z",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+        "--",
+        "lab",
+        "methods",
+        "prompts",
+        text=False,
+    )
+    paths = sorted(filter(None, raw.split(b"\0")))
+    digest = hashlib.sha256()
+    names = []
+    for encoded in paths:
+        relative = encoded.decode("utf-8", errors="surrogateescape")
+        names.append(relative)
+        digest.update(encoded)
+        digest.update(b"\0")
+        path = ROOT / relative
+        if path.is_file():
+            digest.update(path.read_bytes())
+        else:
+            digest.update(b"<deleted>")
+        digest.update(b"\0")
+    return digest.hexdigest(), names
+
+
+def _sumo_native_extensions() -> list[dict]:
+    """Identify native code loaded by Sumo's default pixi environment without importing it."""
+    candidates = {
+        path
+        for pattern in ("policy_rollout_pybind*", "_g1_extensions*")
+        for path in SUMO_ENV.glob(f"lib/python*/site-packages/**/{pattern}")
+        if path.is_file() and path.suffix in {".so", ".dylib", ".pyd"}
+    }
+    return [
+        {
+            "path": str(path.relative_to(SUMO_ENV)),
+            "mtime_ns": path.stat().st_mtime_ns,
+            "sha256": _sha256_file(path),
+        }
+        for path in sorted(candidates)
+    ]
+
+
+def capture_run_fingerprint() -> dict:
+    """Capture immutable batch-start provenance for source and native code."""
+    captured_at_ns = time.time_ns()
+    workspace_sha256, workspace_files = _workspace_hash()
+    source_state = {
+        "git_head": _git("rev-parse", "HEAD").strip() or "nocommit",
+        "workspace_sha256": workspace_sha256,
+        "workspace_files": workspace_files,
+        "sumo_native_extensions": _sumo_native_extensions(),
+    }
+    fingerprint_sha256 = hashlib.sha256(
+        json.dumps(source_state, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return {
+        "id": fingerprint_sha256,
+        "captured_at": datetime.fromtimestamp(
+            captured_at_ns / 1_000_000_000, tz=timezone.utc
+        ).isoformat(),
+        "captured_at_ns": captured_at_ns,
+        **source_state,
+    }
 
 
 def gates(method: str, scene_ids: list[str], final_eval: bool) -> dict:
@@ -116,12 +199,21 @@ def _episode(args):
     return ep
 
 
-def write_run_page(run_dir: Path, run_id: str, method: str, experiment_id: str, eps: list, summary: dict) -> str:
+def write_run_page(
+    run_dir: Path,
+    run_id: str,
+    method: str,
+    experiment_id: str,
+    eps: list,
+    summary: dict,
+    fingerprint: dict,
+) -> str:
     """runs/<run>/RUN.md: summary + embedded episode videos, viewable in the Omnigent web UI file viewer."""
     lo, hi = summary["success_ci95"]
     lines = [f"# {run_id}: {method} ({experiment_id})", "",
              f"Success {summary['success_rate']:.2f} (95% CI {lo:.2f}-{hi:.2f}), n={summary['episodes']}, "
-             f"median placement error {summary['median_pos_err_cm']:.1f} cm, failures {summary['failure_categories'] or 'none'}.", "",
+             f"median placement error {summary['median_pos_err_cm']:.1f} cm, failures {summary['failure_categories'] or 'none'}.",
+             "", "## Run fingerprint", "", "```json", json.dumps(fingerprint, indent=2, sort_keys=True), "```", "",
              "| scene | seed | success | block errors (cm) | failures | video |", "|---|---|---|---|---|---|"]
     for e in eps:
         errs = ", ".join(f"{b['pos_err'] * 100:.1f}" for b in e["blocks"])
@@ -137,7 +229,9 @@ def write_run_page(run_dir: Path, run_id: str, method: str, experiment_id: str, 
 
 
 def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episodes_per_scene: int = 3,
-                  seed0: int = 0, author: str = "experiment_runner", final_eval: bool = False) -> dict:
+                  seed0: int = 0, author: str = "experiment_runner", final_eval: bool = False,
+                  max_workers: int | None = None) -> dict:
+    fingerprint = capture_run_fingerprint()
     exp = record.get(experiment_id)
     if exp is None or exp["kind"] != "experiment":
         raise ValueError(f"{experiment_id!r} is not an experiment in the record")
@@ -145,10 +239,22 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
         raise ValueError(f"experiment {experiment_id} has status {exp['data'].get('status')!r}; the planner must select it first")
     g = gates(method, scene_ids, final_eval)
     n = len(scene_ids) * episodes_per_scene
-    done = sum(r["data"]["episodes"] for r in record.query("run", contains=f'"experiment_id": "{experiment_id}"', limit=1000))
-    if not final_eval and done + n > int(exp["data"]["episodes"]):
-        raise RuntimeError(f"experiment {experiment_id} planned {exp['data']['episodes']} episodes; {done} already run, "
-                           f"{n} more requested. Propose a new experiment for more.")
+    prior = record.query("run", contains=f'"experiment_id": "{experiment_id}"', limit=1000)
+    # A batch call evaluates one method. A parity/verification run made under
+    # the same experiment id for another method is still globally charged, but
+    # must not consume this method arm's planned scene/seed tuples.
+    done = {(scene_id, seed)
+            for r in prior if r["data"]["method"] == method
+            for scene_id in r["data"].get("scene_ids", [])
+            for seed in range(r["data"]["seeds"][0], r["data"]["seeds"][1] + 1)}
+    requested = {(scene_id, seed0 + i)
+                 for scene_id in scene_ids
+                 for i in range(episodes_per_scene)}
+    if not final_eval and len(done | requested) > int(exp["data"]["episodes"]):
+        raise RuntimeError(f"experiment {experiment_id} planned {exp['data']['episodes']} unique episodes; "
+                           f"{len(done)} already run for {method}, "
+                           f"{len(requested - done)} new episodes requested. "
+                           f"Propose a new experiment for more.")
     if n > budget()["episodes_left"]:
         raise RuntimeError(f"budget: {n} episodes requested, {budget()['episodes_left']} left")
     smoke = _episode((g["scenes"][0], g["cfg"], 10_000, None, False))
@@ -160,7 +266,11 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
     run_dir.mkdir(parents=True, exist_ok=True)
     # video for the first seed of every scene, plus every failed episode
     jobs = [(s, g["cfg"], seed0 + i, str(run_dir), i == 0) for s in g["scenes"] for i in range(episodes_per_scene)]
-    with ProcessPoolExecutor(MAX_WORKERS) as ex:
+    # Sumo-based stages are load-sensitive (RS-011: walk outcomes changed under CPU contention), so they run
+    # one episode at a time unless the method config or the caller says otherwise.
+    sumo = "sumo" in str(g["cfg"]["stages"].get("build", ""))
+    workers = max_workers or g["cfg"].get("max_workers") or (1 if sumo else MAX_WORKERS)
+    with ProcessPoolExecutor(workers) as ex:
         eps = list(ex.map(_episode, jobs))
         wall = time.time() - t0
         # failed episodes without a video: replay them with frames (episodes are deterministic per seed)
@@ -171,16 +281,20 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
             eps[i]["video"] = e.get("video")
     _charge(n)
 
+    for episode in eps:
+        episode["run_fingerprint"] = fingerprint
     (run_dir / "episodes.jsonl").write_text("\n".join(json.dumps(e) for e in eps))
-    summary = metrics.summarize(eps) | {"wall_s": round(wall, 1), "workers": MAX_WORKERS,
+    summary = metrics.summarize(eps) | {"wall_s": round(wall, 1), "workers": workers,
                                          "episodes_per_hour": round(n / wall * 3600)}
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=1))
     (run_dir / "method.yaml").write_text((ROOT / "methods" / f"{method}.yaml").read_text())
     run_id = record.add("run", author, {
-        "experiment_id": experiment_id, "method": method, "commit": git_version(), "scene_ids": scene_ids,
+        "experiment_id": experiment_id, "method": method,
+        "commit": f"{fingerprint['git_head'][:7]}+state.{fingerprint['id'][:8]}",
+        "run_fingerprint": fingerprint, "scene_ids": scene_ids,
         "seeds": [seed0, seed0 + episodes_per_scene - 1], "episodes": n, "results_path": str(run_dir.relative_to(ROOT)),
         "final_eval": final_eval, "idealizations": g["cfg"].get("idealizations", []), "summary": summary})
-    page = write_run_page(run_dir, run_id, method, experiment_id, eps, summary)
+    page = write_run_page(run_dir, run_id, method, experiment_id, eps, summary, fingerprint)
     videos = [{"scene": e["scene"], "seed": e["seed"], "success": e["success"], **e["video"]} for e in eps if e.get("video")]
     return {"run_id": run_id, "summary": summary, "run_page": page, "videos": videos}
 

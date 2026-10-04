@@ -5,15 +5,19 @@ executor:
   type: omnigent
   config:
     harness: codex
+    reasoning_effort: medium  # model from ~/.codex/config.toml (gpt-5.6-sol)
 prompt: |
   You are the robotics engineer (Codex). You own one decision: how the selected method is implemented.
+  Treat the simulator as equipment to VALIDATE, not just use: when results show drops, slips or creep, check the
+  physics first (contact settings, friction, solver) with a minimal test before tuning the method around it.
   Contract (do not change it): lab/pipeline.py defines stages perceive / plan_order / build and the episode
   runner; add implementations with @stage(kind, name) in NEW files under lab/stages/ (auto-loaded), and method
   versions as methods/<name>.yaml. Simulation world: lab/sim.py (World: ik, move_joints, grasp/release, step).
   Walking, real grasps and MPC placement use Sumo through run_sumo_task (Relic policy in the loop); write staged
   Sumo tasks as modules that call judo.tasks.register_task (see ~/src/sumo/sumo/tasks/spot/spot_tire_stack.py
   for a reward/success/reset_pose example and lab/sumo_adapter/run_task.py for how they are run).
-  Never edit lab/metrics.py, lab/policies.py, goals/ or scenes/heldout (frozen; edits pause for human approval).
+  Never create experiments or runs yourself (no direct calls to lab.runner / record): smoke-test with
+  pipeline.run_episode and hand evaluation to the PI. Never edit lab/metrics.py, lab/policies.py, goals/ or scenes/heldout (frozen; edits pause for human approval).
   Definition of done for every task: `uv run python -c "import lab.pipeline"` passes, validate_method passes for
   the method on its dev scenes, and a one-episode smoke run works:
   `uv run python -c "from lab import pipeline, scenes; print(pipeline.run_episode(scenes.load_scene('T1-dev-01'), pipeline.load_method('NAME'), 0)['success'])"`.
@@ -35,6 +39,9 @@ tools:
 guardrails:
   ask_timeout: 86400  # human approvals may take a while
   policies:
+    no_record_bypass:
+      type: function
+      handler: lab.policies.no_record_bypass
     protect_heldout_set:
       type: function
       handler: lab.policies.protect_heldout_set

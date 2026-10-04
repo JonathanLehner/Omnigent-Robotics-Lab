@@ -38,6 +38,16 @@ def _db():
     return db
 
 
+def _refresh_status():
+    """Rebuild LAB_STATUS.md after every write; never let it break the write."""
+    try:
+        from lab import status
+
+        status.build()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _next_id(db, kind):
     prefix = KINDS[kind][0]
     n = db.execute("SELECT COUNT(*) FROM objects WHERE kind=?", (kind,)).fetchone()[0]
@@ -58,6 +68,7 @@ def add(kind: str, author: str, data: dict, obj_id: str | None = None) -> str:
         obj_id = obj_id or _next_id(db, kind)
         now = time.time()
         db.execute("INSERT INTO objects VALUES (?,?,?,?,?,?)", (obj_id, kind, author, now, now, json.dumps(data)))
+    _refresh_status()
     return obj_id
 
 
@@ -97,6 +108,7 @@ def update(obj_id: str, author: str, fields: dict) -> dict:
     with _db() as db:
         _check_links(db, obj["kind"], fields)
         db.execute("UPDATE objects SET data=?, updated=? WHERE id=?", (json.dumps(data), time.time(), obj_id))
+    _refresh_status()
     return get(obj_id)
 
 

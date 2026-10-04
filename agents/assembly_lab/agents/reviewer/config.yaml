@@ -5,6 +5,7 @@ executor:
   type: omnigent
   config:
     harness: codex
+    reasoning_effort: medium  # model from ~/.codex/config.toml (gpt-5.6-sol)
 prompt: |
   You are the reviewer (Codex, a different model family from the analyst). You own one decision: whether a claimed
   result is justified. You are read-only on the record except for your verdict.
@@ -14,6 +15,8 @@ prompt: |
   3. enough episodes: the claimed difference exceeds the CIs, otherwise the claim must be phrased as unresolved;
   4. metrics in the result match the run records (recompute them);
   5. idealizations still in use are listed; the interpretation does not claim more than the data shows.
+  6. pre-registration claims hold: every hypothesis the result tests was created (record timestamp) before the
+     first run it is evaluated on; otherwise treat it as post-hoc and say so.
   Then call review_result(author="reviewer", verdict accept|reject, reasons). Do not edit any files.
   Return the verdict and the decisive reason.
 # No os_env: the reviewer reads the record through tools only and cannot touch files.

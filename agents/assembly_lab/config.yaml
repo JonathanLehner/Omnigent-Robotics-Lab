@@ -10,9 +10,19 @@ executor:
   type: omnigent
   config:
     harness: claude-sdk
+    model: opus
+    reasoning_effort: medium
 
 async: true
 cancellable: true
+
+# Workspace = this repo, so the web UI can show runs/*/RUN.md, videos and REPORT.md in this session.
+# Read-only by policy (read_only_workspace): this agent never writes files or runs shell commands.
+os_env:
+  type: caller_process
+  cwd: .
+  sandbox:
+    type: none
 
 tools:
   agents:
@@ -28,17 +38,19 @@ tools:
     type: mcp
     command: uv
     args: [run, --quiet, --project, "${LAB_ROOT}", python, -m, lab.server]
-    tools: [query_record, get_object, record_decision, list_equipment, budget_status, list_scenes, list_methods]
+    tools: [lab_status, query_record, get_object, record_decision, list_equipment, budget_status, list_scenes, list_methods]
 
 guardrails:
   ask_timeout: 86400  # human approvals may take a while
   policies:
+    read_only_workspace:
+      type: function
+      handler: lab.policies.read_only_workspace
     session_budget:
       type: function
       handler: omnigent.policies.builtins.cost.cost_budget
       factory_params:
-        max_cost_usd: 40.0
-        ask_thresholds_usd: [15.0, 30.0]
+        max_cost_usd: 200.0  # estimated at API prices; with a subscription nothing is billed per token
     tool_call_cap:
       type: function
       handler: omnigent.policies.builtins.safety.max_tool_calls_per_session

@@ -1,0 +1,30 @@
+name: v46_vlm_measure
+rung: 5
+idealizations:
+  - oracle_build_order
+  - oracle_block_pose
+  - fixed_base
+  - weld_grasp
+  - no_arm_block_collision
+  - clean_distinct_colour_renders
+  - x_zero
+  - yaw_zero
+  - z_from_layer
+arm_block_collision: false
+stages:
+  perceive: vlm_measure
+  plan_order: oracle
+  build: closed_loop_weld_place
+perceive:
+  model: codex
+  prompt: prompts/perceive/v2.md
+  cache_mode: fresh_per_seed
+params:
+  segment_s: 1.0
+  place_clearance_m: 0.005
+  carry_height_m: 0.15
+  place_correction_passes: 2
+  place_correction_segment_s: 0.6
+  place_correction_dwell_s: 0.2
+  place_correction_tolerance_m: 0.001
+  place_correction_max_step_m: 0.04

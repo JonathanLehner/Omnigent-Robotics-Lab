@@ -32,6 +32,7 @@ def stage(kind, name):
 
 
 def load_method(name: str) -> dict:
+    _load_plugins()  # the tool server is long-lived: pick up stages the engineer added since it started
     cfg = yaml.safe_load((ROOT / "methods" / f"{name}.yaml").read_text())
     for kind in STAGES:
         impl = cfg["stages"][kind]
@@ -48,9 +49,11 @@ def perceive_oracle(scene, cfg):
 
 @stage("perceive", "vlm")
 def perceive_vlm(scene, cfg):
-    """Parse the target picture with a method model. Prompt + schema are versioned files under prompts/."""
+    """Parse the target picture with a method model. Prompt + schema are versioned files under prompts/.
+    cfg perceive.image: main (single front-left picture, default) | multiview (2x2: main, top, robot side, left side)."""
     p = cfg["perceive"]
-    res = call_model(p["model"], p["prompt"], text=p.get("text", ""), image=str(ROOT / scene["image"]))
+    picture = scene[{"main": "image", "multiview": "image_multiview"}[p.get("image", "main")]]
+    res = call_model(p["model"], p["prompt"], text=p.get("text", ""), image=str(ROOT / picture))
     blocks = res["output"]["blocks"]
     for i, b in enumerate(blocks):
         b.setdefault("id", f"p{i}")
@@ -150,6 +153,59 @@ def build_scripted_weld(world, spec, order, pairs, cfg, log):
 
 
 # --- episode -----------------------------------------------------------------
+def _pose_dict(pose):
+    """JSON-ready world-frame pose for episode telemetry."""
+    if pose is None:
+        return None
+    pos, quat = pose
+    return {
+        "position_xyz": np.asarray(pos, dtype=float).tolist(),
+        "quaternion_wxyz": np.asarray(quat, dtype=float).tolist(),
+    }
+
+
+def _observe_pre_release_poses(world):
+    """Record pose reads immediately preceding weld or gripper release.
+
+    The wrappers only read simulator state and delegate to the original methods,
+    so enabling episode telemetry cannot affect the physics trajectory.
+    """
+    poses = {}
+    last_pose = [None, None]
+    saw_open = False
+    block_pose = world.block_pose
+    release = world.release
+    set_gripper = world.set_gripper
+    gripper_act = world._act("arm_f1x")
+
+    def observed_block_pose(block_id):
+        pose = block_pose(block_id)
+        last_pose[:] = [block_id, pose]
+        return pose
+
+    def observed_release():
+        if world.held:
+            block_id = world.held[0]
+            poses[block_id] = block_pose(block_id)
+        return release()
+
+    def observed_set_gripper(open_):
+        nonlocal saw_open
+        # Contact-grasp stages release by reopening the fingers rather than by
+        # calling World.release(). Ignore the initial open command.
+        if open_:
+            is_already_open = np.isclose(world.d.ctrl[gripper_act], -1.0)
+            if saw_open and not is_already_open and last_pose[0] is not None:
+                poses[last_pose[0]] = last_pose[1]
+            saw_open = True
+        return set_gripper(open_)
+
+    world.block_pose = observed_block_pose
+    world.release = observed_release
+    world.set_gripper = observed_set_gripper
+    return poses
+
+
 def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None = None) -> dict:
     rng = np.random.default_rng(seed)
     log = {"scene": scene["id"], "tier": scene["tier"], "seed": seed, "method": cfg["name"], "failures": [], "stages": []}
@@ -167,14 +223,31 @@ def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None =
         spec, order = [], []
     pairs, fails = _match(spec, scene)
     log["failures"] += fails
-    world = sim.World(blocks, arm_block_collision=cfg.get("arm_block_collision", False), frame_every_s=frame_every_s)
+    pictures = {}
+    if frame_every_s:  # videos show the target: ghost blocks at the site + the picture Spot was given
+        views = scene.get("image_views", {})
+        pictures = {"target (given)": ROOT / scene["image"], "target top": ROOT / views["top"]} if "top" in views \
+            else {"target (given)": ROOT / scene["image"]}
+    world = sim.World(blocks, arm_block_collision=cfg.get("arm_block_collision", False), frame_every_s=frame_every_s,
+                      target=[scenes.to_world(b) for b in scene["target"]["blocks"]] if frame_every_s else None,
+                      target_pictures=pictures, physics=cfg.get("physics"))
+    pre_release_poses = _observe_pre_release_poses(world)
     STAGES["build"][cfg["stages"]["build"]](world, spec, order, pairs, cfg, log)
     world.step(int(metrics.SETTLE_S / world.m.opt.timestep))  # verify: settle after the last release
     per_block = []
     for b in scene["target"]["blocks"]:
         pos, quat = world.block_pose(b["id"])
-        pe, ae = metrics.block_errors(sim.SITE + np.asarray(b["pos"]), b["yaw"], pos, quat)
-        per_block.append({"id": b["id"], "pos_err": pe, "ang_err": ae})
+        target_pos = sim.SITE + np.asarray(b["pos"])
+        target = scenes.to_world(b)
+        pe, ae = metrics.block_errors(target_pos, b["yaw"], pos, quat)
+        per_block.append({
+            "id": b["id"],
+            "pos_err": pe,
+            "ang_err": ae,
+            "final_pose": _pose_dict((pos, quat)),
+            "target_pose": _pose_dict((target["pos"], target["quat"])),
+            "pre_release_pose": _pose_dict(pre_release_poses.get(b["id"])),
+        })
     log["blocks"] = per_block
     log["success"] = metrics.episode_success(per_block)
     if not log["success"] and not log["failures"]:
@@ -186,10 +259,20 @@ def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None =
 
 
 def _load_plugins():
+    """Import new stage modules and reload changed ones (lab/stages/*.py register via @stage)."""
+    import sys
+
     pkg = ROOT / "lab" / "stages"
     if pkg.is_dir():
         for mod in pkgutil.iter_modules([str(pkg)]):
-            importlib.import_module(f"lab.stages.{mod.name}")
+            name = f"lab.stages.{mod.name}"
+            if name in sys.modules:
+                m = sys.modules[name]
+                if Path(m.__file__).stat().st_mtime > getattr(m, "_loaded_mtime", 0):
+                    importlib.reload(m)
+            else:
+                m = importlib.import_module(name)
+            m._loaded_mtime = Path(m.__file__).stat().st_mtime
 
 
 _load_plugins()

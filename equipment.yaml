@@ -9,6 +9,13 @@ equipment:
     tools: [run_sim_batch, render_rollout, check_stability, make_dev_scene]
     cost: "~0.5-3 s wall per episode (T0-T3), 8 parallel workers"
     idealizations: [fixed_base, weld_grasp, no_arm_block_collision]
+    physics_option: >-
+      Method configs may set `physics: {cone: elliptic, impratio: 10}` (optionally noslip_iterations). Default is
+      MuJoCo's pyramidal cone with impratio 1, under which contacts creep: a cube on a cube (mu 0.9) slid 3.6 cm at a
+      30 deg tilt and slid off at 38 deg (Coulomb predicts sticking up to 42 deg). Elliptic + impratio 10 cut the
+      creep ~50x (0.07 cm at 30 deg). Changing physics changes every result: compare methods only under the same
+      physics, and re-run the control under the new physics. Methods tuned on the default (e.g. v3_grasp) may need
+      re-tuning: v3_grasp reported slip on 12/12 test episodes under elliptic physics.
   - name: sumo_mpc
     kind: sampling-based MPC + whole-body policy
     env: pixi (~/src/sumo), judo C++ policy-in-the-loop rollouts, Relic Spot policy
@@ -16,6 +23,15 @@ equipment:
     tools: [run_sumo_task]
     cost: "~2.6x slower than real time with 24 rollouts on the M4 (measured)"
     known_issues: [upstream run_mpc ignores the task's rollout backend (adapter fixes it), spot_box_push success() uses a stale config field]
+  - name: multiview_target_pictures
+    kind: perception input
+    provides: >-
+      Every scene has, besides the single main picture (scene.image), views from the top, the robot's side and the
+      left side (scene.image_views) and a labeled 2x2 merge of all four (scene.image_multiview). Use it with
+      perceive.image: multiview in a method config, or eval_prompt(..., image="multiview"). Prompts must explain the
+      views (e.g. top view = footprint in x/y, side views = layers and depth). Episode videos show the same idea:
+      a labeled 2x2 tile (main, top, far side, left side).
+    tools: [get_scene, eval_prompt, call_model]
   - name: method_models
     kind: LLM/VLM inside the pipeline
     env: codex CLI (ChatGPT login), claude CLI (Claude login); no API keys

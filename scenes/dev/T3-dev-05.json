@@ -82,5 +82,12 @@
    "yaw": 0.0
   }
  ],
- "image": "scenes/dev/T3-dev-05.png"
+ "image": "scenes/dev/T3-dev-05.png",
+ "image_views": {
+  "main": "scenes/dev/T3-dev-05_main.png",
+  "top": "scenes/dev/T3-dev-05_top.png",
+  "robot side": "scenes/dev/T3-dev-05_robot_side.png",
+  "left side": "scenes/dev/T3-dev-05_left_side.png"
+ },
+ "image_multiview": "scenes/dev/T3-dev-05_multiview.png"
 }

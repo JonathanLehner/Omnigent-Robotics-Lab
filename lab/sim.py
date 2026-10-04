@@ -10,9 +10,15 @@ from pathlib import Path
 
 import mujoco
 import numpy as np
-from robot_descriptions import spot_mj_description
+_CACHED_SPOT = Path.home() / ".cache/robot_descriptions/mujoco_menagerie/boston_dynamics_spot/spot_arm.xml"
+if _CACHED_SPOT.exists():
+    # Importing robot_descriptions runs `git checkout` on the shared cache; 8 parallel workers race on its
+    # index.lock and crash, so use the cached file directly once it exists.
+    SPOT_XML = _CACHED_SPOT
+else:
+    from robot_descriptions import spot_mj_description
 
-SPOT_XML = Path(spot_mj_description.PACKAGE_PATH) / "spot_arm.xml"
+    SPOT_XML = Path(spot_mj_description.PACKAGE_PATH) / "spot_arm.xml"
 SITE = np.array([0.85, 0.0, 0.0])  # build-site origin (structure frame) in world coordinates
 BLOCK_TYPES = {"cube": (0.12, 0.12, 0.10), "brick": (0.12, 0.24, 0.10)}  # full x, y, z sizes (m)
 BLOCK_MASS = {"cube": 0.4, "brick": 0.8}
@@ -61,7 +67,7 @@ def add_block(spec, bid, btype, color, pos, quat, collide_robot):
                   rgba=[0.2, 0.2, 0.2, 1], mass=0.02, contype=ct, conaffinity=ct)
 
 
-def build_model(blocks: list[dict], robot: bool = True, arm_block_collision: bool = False) -> mujoco.MjModel:
+def build_model(blocks: list[dict], robot: bool = True, arm_block_collision: bool = False, physics: dict | None = None) -> mujoco.MjModel:
     """blocks: [{id, type, color, pos (world), quat}]."""
     spec = mujoco.MjSpec.from_file(str(SPOT_XML)) if robot else mujoco.MjSpec()
     if robot:
@@ -76,6 +82,14 @@ def build_model(blocks: list[dict], robot: bool = True, arm_block_collision: boo
             if g.contype or g.conaffinity:
                 g.contype, g.conaffinity = 1, 1
     spec.option.timestep = 0.002
+    # physics: None = MuJoCo defaults (pyramidal cone, impratio 1), which let stacked/grasped blocks creep: a cube on
+    # a cube with mu=0.9 slid 3.6 cm at 30 deg tilt. {"cone": "elliptic", "impratio": 10} (MuJoCo's advice for
+    # manipulation) cut that ~50x. Opt-in per method config (`physics:`) so experiments stay comparable.
+    if physics:
+        if physics.get("cone") == "elliptic":
+            spec.option.cone = mujoco.mjtCone.mjCONE_ELLIPTIC
+        spec.option.impratio = physics.get("impratio", 1)
+        spec.option.noslip_iterations = physics.get("noslip_iterations", 0)
     spec.visual.global_.offwidth, spec.visual.global_.offheight = 1280, 960
     tex = spec.add_texture(name="grid", type=mujoco.mjtTexture.mjTEXTURE_2D, builtin=mujoco.mjtBuiltin.mjBUILTIN_CHECKER,
                            rgb1=[0.82, 0.82, 0.8], rgb2=[0.74, 0.74, 0.72], width=512, height=512)
@@ -113,10 +127,14 @@ def pitch_quat(deg):
 class World:
     """One episode's physics. Units: meters, seconds; poses are world frame, quats wxyz."""
 
-    def __init__(self, blocks, arm_block_collision=False, frame_every_s=None, cam=None):
-        self.m = build_model(blocks, robot=True, arm_block_collision=arm_block_collision)
+    def __init__(self, blocks, arm_block_collision=False, frame_every_s=None, cam=None, target=None, target_pictures=None, physics=None):
+        """target: world-frame target blocks, drawn as ghosts in video frames (render only, physics unaffected).
+        target_pictures: {label: png path} shown next to the live views in video frames."""
+        self.target, self.target_pictures = target or [], target_pictures or {}
+        self.m = build_model(blocks, robot=True, arm_block_collision=arm_block_collision, physics=physics)
         self.d = mujoco.MjData(self.m)
         self.dk = mujoco.MjData(self.m)  # scratch data for IK
+        self.base_body = self.m.body("body").id
         self.wr1 = self.m.body("arm_link_wr1").id
         self.arm_q = [self.m.joint(j).qposadr[0] for j in ARM_JOINTS]
         self.arm_v = [self.m.joint(j).dofadr[0] for j in ARM_JOINTS]
@@ -137,6 +155,16 @@ class World:
     def block_pose(self, bid):
         a = self.m.joint(f"{bid}_free").qposadr[0]
         return self.d.qpos[a:a + 3].copy(), self.d.qpos[a + 3:a + 7].copy()
+
+    def base_pose(self):
+        return self.m.body_pos[self.base_body].copy(), self.m.body_quat[self.base_body].copy()
+
+    def set_base_pose(self, pos, quat):
+        """Set the welded assembly robot root; subsequent IK uses this exact pose."""
+        self.m.body_pos[self.base_body] = np.asarray(pos, dtype=float)
+        q = np.asarray(quat, dtype=float)
+        self.m.body_quat[self.base_body] = q / np.linalg.norm(q)
+        mujoco.mj_forward(self.m, self.d)
 
     def tip_pose(self, d=None):
         d = d or self.d
@@ -213,12 +241,101 @@ class World:
                 self.frames.append(self.render())
                 self._next_frame += self.frame_every_s
 
-    def render(self, w=480, h=360):
+    def render(self, w=320, h=240):
+        """One video frame: VIDEO_VIEWS tiled 2x2 and labeled (640x480 total)."""
         if self._renderer is None:
             self._renderer = mujoco.Renderer(self.m, h, w)
-        self._renderer.update_scene(self.d, camera=self.cam or default_camera())
-        self._renderer.scene.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0  # shadows cost ~80% of render time
-        return self._renderer.render()
+            soften_lights(self.m)  # rendering-only fields, physics unaffected
+        imgs = {}
+        for name, view in VIDEO_VIEWS.items():
+            cam = self.cam if (name == "main" and self.cam) else view_camera(view, SITE + [-0.25, 0, 0.2])
+            self._renderer.update_scene(self.d, camera=cam)
+            self._renderer.scene.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0  # shadows cost ~80% of render time
+            self._draw_ghosts(self._renderer.scene)
+            imgs[name] = self._renderer.render().copy()
+        frame = tile_views(imgs)
+        if self.target_pictures:  # third column: what Spot was asked to build
+            from PIL import Image
+
+            if not hasattr(self, "_target_col"):
+                col = [np.asarray(Image.open(p).convert("RGB").resize((w, h))) for p in self.target_pictures.values()]
+                self._target_col = tile_views(dict(zip(self.target_pictures, col)))[:, :w] if len(col) == 1 else \
+                    np.concatenate([tile_views({k: c})[:h, :w] for k, c in zip(self.target_pictures, col)], 0)
+            frame = np.concatenate([frame, self._target_col[:frame.shape[0]]], 1)
+        return frame
+
+    def _draw_ghosts(self, scn):
+        """Semi-transparent target blocks, added to the rendered scene only."""
+        for b in self.target:
+            if scn.ngeom >= scn.maxgeom:
+                return
+            mat = np.zeros(9)
+            mujoco.mju_quat2Mat(mat, np.asarray(b["quat"], float))
+            sx, sy, sz = BLOCK_TYPES[b["type"]]
+            mujoco.mjv_initGeom(scn.geoms[scn.ngeom], mujoco.mjtGeom.mjGEOM_BOX, np.array([sx, sy, sz]) / 2,
+                                np.asarray(b["pos"], float), mat, np.array([*COLORS[b["color"]], 0.28], np.float32))
+            scn.ngeom += 1
+
+
+# Named views (azimuth, elevation, distance). Azimuth 0 looks from the robot's side (+x), 180 from beyond the
+# structure, 270 from the robot's left (+y). Target pictures use STRUCTURE_VIEWS; episode videos use VIDEO_VIEWS.
+STRUCTURE_VIEWS = {"main": (200, -22, 1.1), "top": (180, -89.9, 0.9), "robot side": (0, -12, 1.1),
+                   "left side": (270, -12, 1.1)}
+VIDEO_VIEWS = {"main": (215, -28, 1.9), "top": (180, -89.9, 1.8), "far side": (180, -15, 1.6),
+               "left side": (270, -12, 2.4)}
+
+
+def soften_lights(m):
+    """Rendering-only: dimmer lights, no specular. The defaults saturate up-facing surfaces (orange reads as yellow)."""
+    m.light_specular[:] = 0
+    m.light_diffuse[:] = m.light_diffuse * 0.6
+    m.vis.headlight.specular[:] = 0
+    m.vis.headlight.diffuse[:] = 0.24
+    m.vis.headlight.ambient[:] = 0.15
+
+
+def view_camera(view, lookat):
+    az, el, dist = view
+    cam = mujoco.MjvCamera()
+    cam.lookat[:] = lookat
+    cam.azimuth, cam.elevation, cam.distance = az, el, dist
+    return cam
+
+
+def tile_views(images: dict) -> np.ndarray:
+    """2x2 grid of named views, each labeled in its corner."""
+    from PIL import Image, ImageDraw
+
+    tiles = []
+    for name, img in images.items():
+        im = Image.fromarray(img)
+        dr = ImageDraw.Draw(im)
+        dr.rectangle([0, 0, 8 + 7 * len(name), 16], fill=(0, 0, 0))
+        dr.text((4, 3), name, fill=(255, 255, 255))
+        tiles.append(np.asarray(im))
+    while len(tiles) < 4:
+        tiles.append(np.zeros_like(tiles[0]))
+    return np.concatenate([np.concatenate(tiles[:2], 1), np.concatenate(tiles[2:4], 1)], 0)
+
+
+def render_structure_views(blocks: list[dict], stem: str, w=480, h=360) -> dict:
+    """Target pictures from STRUCTURE_VIEWS: <stem>_<view>.png each, plus <stem>_multiview.png (2x2, labeled)."""
+    from PIL import Image
+
+    m = build_model(blocks, robot=False)
+    d = mujoco.MjData(m)
+    mujoco.mj_step(m, d, 250)
+    soften_lights(m)
+    r = mujoco.Renderer(m, h, w)
+    imgs, paths = {}, {}
+    for name, view in STRUCTURE_VIEWS.items():
+        r.update_scene(d, camera=view_camera(view, SITE + [0, 0, 0.12]))
+        imgs[name] = r.render().copy()
+        paths[name] = f"{stem}_{name.replace(' ', '_')}.png"
+        Image.fromarray(imgs[name]).save(paths[name])
+    paths["multiview"] = f"{stem}_multiview.png"
+    Image.fromarray(tile_views(imgs)).save(paths["multiview"])
+    return paths
 
 
 def default_camera(azimuth=215.0, elevation=-28.0, distance=1.9):

@@ -5,6 +5,7 @@ Structure spec (structure frame = build site on the ground, origin at the center
 """
 
 import json
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -49,6 +50,37 @@ def templates(tier: str, rng, variant: int | None = None) -> tuple[str, list[dic
     return name, choices[name]
 
 
+OFF_GRID_LAYOUTS = {
+    "T2-dev-11": {"structure": "tower", "blocks": [
+        _b("cube", 0.000, 0), _b("cube", 0.022, 1), _b("cube", 0.040, 2),
+    ]},
+    "T2-dev-12": {"structure": "bridge", "blocks": [
+        _b("cube", -0.065, 0), _b("cube", 0.065, 0), _b("brick", 0.025, 1),
+    ]},
+    "T2-dev-13": {"structure": "bridge", "blocks": [
+        _b("cube", -0.077, 0), _b("cube", 0.058, 0), _b("brick", -0.012, 1),
+    ]},
+    "T2-dev-14": {"structure": "tower", "blocks": [
+        _b("cube", 0.000, 0), _b("cube", -0.027, 1), _b("cube", -0.012, 2),
+    ]},
+    "T3-dev-13": {"structure": "L", "blocks": [
+        _b("cube", -0.065, 0), _b("cube", 0.065, 0),
+        _b("cube", -0.043, 1), _b("cube", -0.078, 2),
+    ]},
+    "T3-dev-14": {"structure": "T", "blocks": [
+        _b("cube", 0.000, 0), _b("cube", 0.020, 1), _b("brick", 0.045, 2),
+    ]},
+    "T3-dev-15": {"structure": "pyramid", "blocks": [
+        _b("cube", -0.130, 0), _b("cube", 0.000, 0), _b("cube", 0.130, 0),
+        _b("cube", -0.047, 1), _b("cube", 0.077, 1), _b("cube", 0.028, 2),
+    ]},
+    "T3-dev-16": {"structure": "pyramid", "blocks": [
+        _b("cube", -0.130, 0), _b("cube", 0.000, 0), _b("cube", 0.130, 0),
+        _b("cube", -0.086, 1), _b("cube", 0.079, 1), _b("cube", -0.019, 2),
+    ]},
+}
+
+
 def support_relations(blocks):
     """Fill `on`: A rests on B if A sits one layer above B and their footprints overlap in y."""
     for a in blocks:
@@ -62,6 +94,44 @@ def support_relations(blocks):
 
 def oracle_order(blocks):
     return [b["id"] for b in sorted(blocks, key=lambda b: (round(b["pos"][2], 3), b["pos"][1]))]
+
+
+def is_support_order(order, blocks):
+    """Whether every block appears after all of the blocks it rests on."""
+    position = {block_id: i for i, block_id in enumerate(order)}
+    return len(position) == len(blocks) and all(
+        support_id in position and position[support_id] < position[b["id"]]
+        for b in blocks
+        for support_id in b["on"]
+    )
+
+
+def _permute_blocks(blocks, start, rng):
+    """Shuffle target listing and IDs independently while preserving physical block identity."""
+    old_ids = [b["id"] for b in blocks]
+    if not any(b["on"] for b in blocks):
+        raise ValueError("cannot violate support order for a structure with no support relations")
+
+    while True:
+        list_indices = list(map(int, rng.permutation(len(blocks))))
+        listed_old_ids = [old_ids[i] for i in list_indices]
+        if not is_support_order(listed_old_ids, blocks):
+            break
+
+    while True:
+        id_indices = list(map(int, rng.permutation(len(blocks))))
+        id_map = {old_id: f"b{new_i}" for old_id, new_i in zip(old_ids, id_indices)}
+        old_ids_in_new_id_order = sorted(old_ids, key=id_map.__getitem__)
+        if not is_support_order(old_ids_in_new_id_order, blocks):
+            break
+
+    for b in blocks:
+        b["id"] = id_map[b["id"]]
+        b["on"] = [id_map[support_id] for support_id in b["on"]]
+    for s in start:
+        s["id"] = id_map[s["id"]]
+    blocks[:] = [blocks[i] for i in list_indices]
+    return {"listed_old_ids": listed_old_ids, "id_map": id_map}
 
 
 def to_world(b, pos=None, yaw=None):
@@ -102,10 +172,13 @@ def reachable(blocks, start) -> bool:
     return True
 
 
-def make_scene(scene_id, tier, split, seed, variant=None):
+def make_scene(scene_id, tier, split, seed, variant=None, permute_blocks=False, layout=None):
     rng = np.random.default_rng(seed)
     while True:
-        name, blocks = templates(tier, rng, variant)
+        if layout is None:
+            name, blocks = templates(tier, rng, variant)
+        else:
+            name, blocks = layout["structure"], deepcopy(layout["blocks"])
         colors = rng.choice(sorted(sim.COLORS), len(blocks), replace=False)
         for i, (b, c) in enumerate(zip(blocks, colors)):
             b.update(id=f"b{i}", color=str(c))
@@ -116,11 +189,32 @@ def make_scene(scene_id, tier, split, seed, variant=None):
     d = SCENES / split
     d.mkdir(parents=True, exist_ok=True)
     image = sim.render_structure([to_world(b) for b in blocks], str(d / f"{scene_id}.png"))
+    views = sim.render_structure_views([to_world(b) for b in blocks], str(d / scene_id))
+    canonical_order = oracle_order(blocks)
+    permutation = _permute_blocks(blocks, start, rng) if permute_blocks else None
     scene = {"id": scene_id, "tier": tier, "split": split, "seed": seed, "structure": name,
-             "target": {"blocks": blocks}, "oracle_order": oracle_order(blocks), "start": start,
-             "image": str(Path(image).relative_to(ROOT))}
+             "target": {"blocks": blocks},
+             "oracle_order": [permutation["id_map"][block_id] for block_id in canonical_order]
+             if permutation else canonical_order,
+             "start": start,
+             "image": str(Path(image).relative_to(ROOT)),
+             "image_views": {k: str(Path(v).relative_to(ROOT)) for k, v in views.items() if k != "multiview"},
+             "image_multiview": str(Path(views["multiview"]).relative_to(ROOT))}
+    if permutation:
+        scene["block_permutation"] = permutation
     (d / f"{scene_id}.json").write_text(json.dumps(scene, indent=1))
     return scene
+
+
+def add_views(split_dirs=("dev", "heldout")):
+    """Add multi-view target pictures to existing scenes without changing targets or the main picture."""
+    for split in split_dirs:
+        for f in sorted((SCENES / split).glob("*.json")):
+            sc = json.loads(f.read_text())
+            views = sim.render_structure_views([to_world(b) for b in sc["target"]["blocks"]], str(f.with_suffix("")))
+            sc["image_views"] = {k: str(Path(v).relative_to(ROOT)) for k, v in views.items() if k != "multiview"}
+            sc["image_multiview"] = str(Path(views["multiview"]).relative_to(ROOT))
+            f.write_text(json.dumps(sc, indent=1))
 
 
 def load_scene(scene_id: str) -> dict:
@@ -151,4 +245,6 @@ def generate(n_dev=6, n_heldout=4):
 
 
 if __name__ == "__main__":
-    generate()
+    import sys
+
+    add_views() if sys.argv[1:] == ["views"] else generate()

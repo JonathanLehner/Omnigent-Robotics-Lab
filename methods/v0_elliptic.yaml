@@ -1,0 +1,16 @@
+# Method v0 under manipulation-grade elliptic contact physics.
+name: v0_elliptic
+rung: 0
+idealizations: [oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision]
+physics:
+  cone: elliptic
+  impratio: 10
+arm_block_collision: false
+stages:
+  perceive: oracle
+  plan_order: oracle
+  build: scripted_weld
+params:
+  segment_s: 1.0
+  place_clearance_m: 0.005
+  carry_height_m: 0.15

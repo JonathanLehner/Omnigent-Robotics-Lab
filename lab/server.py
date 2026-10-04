@@ -112,6 +112,15 @@ def get_object(obj_id: str) -> dict:
 
 
 @mcp.tool()
+def lab_status() -> str:
+    """The plan and where the lab is: ladder x tiers grid (latest success, CI, run), unfinished experiments,
+    hypotheses, latest decision, budget, recent run pages. Markdown; post it in chat so the human sees it."""
+    from lab import status
+
+    return Path(status.build()).read_text()
+
+
+@mcp.tool()
 def export_record() -> dict:
     """Export the full record to record/export.json and build REPORT.md (for judges and reconstruction)."""
     from lab import report
@@ -172,14 +181,20 @@ def get_scene(scene_id: str) -> dict:
 
 
 @mcp.tool()
-def make_dev_scene(author: str, tier: str, seed: int) -> dict:
-    """Scene designer: generate a new DEV scene for a tier (T0-T3) with a reachable start layout and target picture."""
-    sid = f"{tier}-dev-x{seed}"
-    sc = scenes.make_scene(sid, tier, "dev", seed=10_000 + seed)
-    record.add("scene", author, {"tier": tier, "split": "dev", "structure": sc["structure"],
-                                 "spec_path": f"scenes/dev/{sid}.json", "image_path": sc["image"],
-                                 "n_blocks": len(sc["target"]["blocks"])}, obj_id=sid)
-    return {"id": sid, "structure": sc["structure"], "image": sc["image"]}
+def make_dev_scene(author: str, tier: str, seed: int, permute_blocks: bool = False,
+                   scene_id: str = "", layout: dict | None = None) -> dict:
+    """Generate a DEV scene, optionally with an explicit id and {structure, blocks} target layout."""
+    sid = scene_id or f"{tier}-dev-x{seed}"
+    sc = scenes.make_scene(sid, tier, "dev", seed=10_000 + seed, permute_blocks=permute_blocks,
+                           layout=layout)
+    data = {"tier": tier, "split": "dev", "structure": sc["structure"],
+            "spec_path": f"scenes/dev/{sid}.json", "image_path": sc["image"],
+            "n_blocks": len(sc["target"]["blocks"])}
+    if permute_blocks:
+        data["block_permutation"] = sc["block_permutation"]
+    record.add("scene", author, data, obj_id=sid)
+    return {"id": sid, "structure": sc["structure"], "image": sc["image"],
+            **({"block_permutation": sc["block_permutation"]} if permute_blocks else {})}
 
 
 @mcp.tool()
@@ -212,10 +227,12 @@ def budget_status() -> dict:
 
 @mcp.tool()
 def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episodes_per_scene: int = 3,
-                  seed0: int = 0, final_eval: bool = False) -> dict:
+                  seed0: int = 0, final_eval: bool = False, max_workers: int = 0) -> dict:
     """Runner only: run a SELECTED experiment. Gates + one-episode smoke test first (free), then parallel episodes.
-    final_eval=True unlocks held-out scenes and requires human approval."""
-    return _j(runner.run_sim_batch(experiment_id, scene_ids, method, episodes_per_scene, seed0, final_eval=final_eval))
+    final_eval=True unlocks held-out scenes and requires human approval. max_workers: parallel episodes (0 = default:
+    8, or 1 for Sumo-based methods, which are load-sensitive); set 1 to run serially."""
+    return _j(runner.run_sim_batch(experiment_id, scene_ids, method, episodes_per_scene, seed0, final_eval=final_eval,
+                                   max_workers=max_workers or None))
 
 
 @mcp.tool()
@@ -244,9 +261,10 @@ def call_model(model: str, prompt_path: str, text: str = "", image: str = "") ->
 
 
 @mcp.tool()
-def eval_prompt(model: str, prompt_path: str, scene_ids: list[str]) -> dict:
+def eval_prompt(model: str, prompt_path: str, scene_ids: list[str], image: str = "main") -> dict:
     """Cheap offline test without simulation: parse each dev scene's target image and score against the oracle spec
-    (block count, color/type match, position error after matching)."""
+    (block count, color/type match, position error after matching). image: main | multiview (2x2 labeled views:
+    main, top, robot side, left side)."""
     import numpy as np
 
     from lab.method_models import call_model as cm
@@ -255,7 +273,7 @@ def eval_prompt(model: str, prompt_path: str, scene_ids: list[str]) -> dict:
     for sid in scene_ids:
         sc = get_scene(sid)
         try:
-            out = cm(model, prompt_path, image=str(ROOT / sc["image"]))["output"]["blocks"]
+            out = cm(model, prompt_path, image=str(ROOT / sc["image" if image == "main" else "image_multiview"]))["output"]["blocks"]
         except Exception as e:  # noqa: BLE001
             rows.append({"scene": sid, "error": str(e)[:300]})
             continue
@@ -276,7 +294,7 @@ def eval_prompt(model: str, prompt_path: str, scene_ids: list[str]) -> dict:
 
 @mcp.tool()
 def run_sumo_task(task: str, episodes: int = 1, episode_length_s: float = 10.0, optimizer: str = "cem",
-                  task_module: str = "", num_rollouts: int = 0) -> dict:
+                  task_module: str = "", num_rollouts: int = 0, video_dir: str = "") -> dict:
     """Run Sumo MPC (Relic whole-body policy in the loop) headless in its pixi env. task_module: path to an
     agent-written module that registers new tasks (staged costs). ~2.5x slower than real time on this Mac."""
     cmd = [str(PIXI), "run", "--manifest-path", str(SUMO_DIR / "pyproject.toml"), "python",
@@ -286,6 +304,8 @@ def run_sumo_task(task: str, episodes: int = 1, episode_length_s: float = 10.0, 
         cmd += ["--task-module", str((ROOT / task_module).resolve())]
     if num_rollouts:
         cmd += ["--num-rollouts", str(num_rollouts)]
+    if video_dir:
+        cmd += ["--video-dir", str((ROOT / video_dir).resolve())]
     res = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, cwd=SUMO_DIR)
     last = [line for line in res.stdout.splitlines() if line.startswith("{")]
     if res.returncode or not last:

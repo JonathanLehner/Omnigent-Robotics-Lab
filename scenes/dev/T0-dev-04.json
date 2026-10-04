@@ -34,5 +34,12 @@
    "yaw": 0.0
   }
  ],
- "image": "scenes/dev/T0-dev-04.png"
+ "image": "scenes/dev/T0-dev-04.png",
+ "image_views": {
+  "main": "scenes/dev/T0-dev-04_main.png",
+  "top": "scenes/dev/T0-dev-04_top.png",
+  "robot side": "scenes/dev/T0-dev-04_robot_side.png",
+  "left side": "scenes/dev/T0-dev-04_left_side.png"
+ },
+ "image_multiview": "scenes/dev/T0-dev-04_multiview.png"
 }

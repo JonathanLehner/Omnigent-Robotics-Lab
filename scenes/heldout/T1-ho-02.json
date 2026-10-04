@@ -58,5 +58,12 @@
    "yaw": 0.0
   }
  ],
- "image": "scenes/heldout/T1-ho-02.png"
+ "image": "scenes/heldout/T1-ho-02.png",
+ "image_views": {
+  "main": "scenes/heldout/T1-ho-02_main.png",
+  "top": "scenes/heldout/T1-ho-02_top.png",
+  "robot side": "scenes/heldout/T1-ho-02_robot_side.png",
+  "left side": "scenes/heldout/T1-ho-02_left_side.png"
+ },
+ "image_multiview": "scenes/heldout/T1-ho-02_multiview.png"
 }

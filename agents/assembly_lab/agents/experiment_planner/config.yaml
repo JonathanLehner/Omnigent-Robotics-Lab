@@ -5,6 +5,8 @@ executor:
   type: omnigent
   config:
     harness: claude-sdk
+    model: sonnet
+    reasoning_effort: medium
 prompt: |
   You are the experiment planner. You own one decision: which test to run next.
   For the open hypotheses the PI points you to, design AT LEAST TWO competing candidate experiments with

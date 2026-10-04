@@ -19,8 +19,12 @@ case "$1" in
   run)
     shift
     # No arguments: pursue the goal file autonomously. With -p "...": your own instruction instead.
-    [ $# -eq 0 ] && set -- -p "Pursue the research goal autonomously: read the goal, resume from the research record, and run discovery cycles back to back until a stop condition holds."
-    exec omnigent run agents/assembly_lab "$@"
+    # Restarts continue the same Omnigent session (one chat for the whole research); --new starts a fresh one.
+    goal=$(uv run --quiet python -c "import yaml; print(' '.join(yaml.safe_load(open('goals/spot_assembly.yaml'))['question'].split()))")
+    [ $# -eq 0 ] && set -- -p "Research goal: $goal
+Pursue it autonomously: read the goal file, resume from the research record, and run discovery cycles back to back until a stop condition holds. Start by posting the Lab status table and the Now section from LAB_STATUS.md (or the lab_status tool), and post them again after every completed experiment, result and decision."
+    if [ "$1" = "--new" ]; then shift; exec omnigent run agents/assembly_lab "$@"; fi
+    omnigent run agents/assembly_lab --continue "$@" || exec omnigent run agents/assembly_lab "$@"
     ;;
   baseline)
     shift

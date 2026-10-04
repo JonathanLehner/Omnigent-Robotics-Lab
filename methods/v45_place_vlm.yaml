@@ -1,0 +1,26 @@
+name: v45_place_vlm
+rung: 4
+idealizations:
+  - oracle_build_order
+  - oracle_block_pose
+  - fixed_base
+  - weld_grasp
+  - scripted_arm
+  - no_arm_block_collision
+arm_block_collision: false
+stages:
+  perceive: vlm
+  plan_order: oracle
+  build: closed_loop_weld_place
+perceive:
+  model: codex
+  prompt: prompts/perceive/v1.md
+params:
+  segment_s: 1.0
+  place_clearance_m: 0.005
+  carry_height_m: 0.15
+  place_correction_passes: 2
+  place_correction_segment_s: 0.6
+  place_correction_dwell_s: 0.2
+  place_correction_tolerance_m: 0.001
+  place_correction_max_step_m: 0.04

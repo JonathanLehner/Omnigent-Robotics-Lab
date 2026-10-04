@@ -78,6 +78,24 @@ def freeze_eval_code(paths: tuple = ("lab/metrics.py", "frozen_eval.sha256", "go
     return evaluate
 
 
+def read_only_workspace(event):
+    """For agents that get a workspace only so the web UI can show files and videos: deny writes and shell."""
+    name, _, _ = _call(event)
+    if name and any(h in name.lower() for h in WRITE_HINTS) and not name.lower().endswith("read"):
+        return {"result": "DENY", "reason": "This agent's workspace is read-only (for viewing runs and reports)."}
+    return None
+
+
+def no_record_bypass(event):
+    """For agents with a shell: experiments and runs go through the planner/runner tools, not direct Python calls."""
+    name, _, blob = _call(event)
+    if name and any(h in name.lower() for h in WRITE_HINTS) and any(
+            k in blob for k in ("run_sim_batch", "record.add", "propose_experiment", "select_experiment", "lab.runner")):
+        return {"result": "DENY", "reason": "Experiments and runs are created only by experiment_planner / "
+                                            "experiment_runner through their tools. Use pipeline.run_episode for smoke tests."}
+    return None
+
+
 def pi_cites_results(event):
     """record_decision must cite at least one result id (the tool re-checks that each result was reviewed)."""
     name, args, _ = _call(event)
@@ -113,4 +131,10 @@ if __name__ == "__main__":
     assert fz(ev("Edit", {"file_path": "lab/pipeline.py"})) is None
     assert fz(ev("Read", {"file_path": "lab/metrics.py"})) is None
     assert pi_cites_results(ev("lab__record_decision", {"result_ids": []}))["result"] == "DENY"
+    assert read_only_workspace(ev("sys_os_shell", {"command": "ls"}))["result"] == "DENY"
+    assert read_only_workspace(ev("sys_os_read", {"path": "runs/x/RUN.md"})) is None
+    assert read_only_workspace(ev("Bash", {"command": "rm x"}))["result"] == "DENY"
+    assert read_only_workspace(ev("lab__run_sim_batch", {})) is None
+    assert no_record_bypass(ev("exec_command", {"cmd": "uv run python -c 'from lab import runner; runner.run_sim_batch(...)'"}))["result"] == "DENY"
+    assert no_record_bypass(ev("exec_command", {"cmd": "uv run python -c 'from lab import pipeline'"})) is None
     print("policies ok")

@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["blocks"],
+  "properties": {
+    "blocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "color", "type", "layer", "supported_by", "rough_y_cm"],
+        "properties": {
+          "id": {"type": "string"},
+          "color": {"type": "string", "enum": ["red", "blue", "green", "yellow", "orange", "purple", "cyan", "white"]},
+          "type": {"type": "string", "enum": ["cube", "brick"]},
+          "layer": {"type": "integer", "minimum": 0},
+          "supported_by": {"type": "array", "items": {"type": "string"}},
+          "rough_y_cm": {"type": "number"}
+        }
+      }
+    }
+  }
+}

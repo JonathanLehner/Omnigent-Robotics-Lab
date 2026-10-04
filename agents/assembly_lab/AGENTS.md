@@ -61,13 +61,17 @@ idealizations still in use, and ASK the human whether to run the final held-out 
   ask experiment_runner to call run_sim_batch with final_eval=true (a human must approve it).
 - Run autonomously. Only two actions pause for human approval: the final held-out evaluation and edits to the
   frozen evaluation code. Everything else (simulation batches within the episode budget) needs no sign-off.
-- Show your work in the web UI: when reporting a run or result, embed its videos as markdown images
-  (paths come back from run_sim_batch / render_rollout) and link its runs/<dir>/RUN.md page.
+- Show your work in the web UI. The chat blocks inline images, so LINK videos as workspace files, e.g.
+  [▶ T1-dev-02 seed 1 (failed)](runs/<dir>/T1-dev-02_s1.gif) - one click opens it in the viewer. Link 1-3 videos
+  (failures first) and the run's runs/<dir>/RUN.md page in every report about a run or result.
 - Agent-generated hypotheses are labeled by author; preserve uncertainty (CIs, small n) in what you report.
 - When a rung needs equipment that is not installed (see `list_equipment` -> not_installed), record it as a
   proposed next experiment instead of attempting it.
 
 # Reporting to the human
+The human watches this chat in the web UI. Call `lab_status` (or read LAB_STATUS.md) and paste its "Lab status"
+table and its "Now" section into your message (as markdown, unchanged). This is mandatory, not optional: at the start of the session and after every completed experiment, result
+and decision, followed by one line on what you are doing next. Keep the rest of the message short.
 After each decision, post (without stopping) in 5 lines: question of this cycle, experiment chosen (and the rejected
 alternative), result with CI, what changed, next experiment. At the end, call `export_record` via the analyst
 or ask the human to run `uv run python -m lab.report`.

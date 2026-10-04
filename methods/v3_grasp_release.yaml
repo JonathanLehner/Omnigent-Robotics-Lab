@@ -1,0 +1,40 @@
+# Rung 3: withdraw from the block face while gradually opening the contact
+# grasp, then lift vertically before retreating. The fixed place bias
+# compensates the measured release drag; it does not read the actual pose.
+name: v3_grasp_release
+rung: 3
+idealizations:
+  - oracle_structure_spec
+  - oracle_build_order
+  - oracle_block_pose
+  - fixed_base
+  - scripted_arm
+  - calibrated_release_bias
+arm_block_collision: true
+stages:
+  perceive: oracle
+  plan_order: oracle
+  build: scripted_real_grasp
+params:
+  segment_s: 2.5
+  place_clearance_m: 0.008
+  carry_height_m: 0.15
+  grasp_tip_offset_m: [0.01, 0.005, 0.01]
+  handle_friction: [1.0, 0.01, 0.001]
+  grasp_close_command: -0.5
+  grasp_close_dwell_s: 1.0
+  release_seat_lower_m: 0.0
+  release_seat_steps: 4
+  release_seat_segment_s: 0.4
+  grasp_open_command: -1.0
+  release_open_s: 0.8
+  release_open_retreat_m: 0.04
+  release_place_bias_m: [0.015, 0.0, 0.0]
+  release_dwell_s: 0.1
+  release_vertical_lift_m: 0.125
+  release_vertical_lift_steps: 12
+  release_phase_settle_s: 5.0
+  min_transport_m: 0.08
+  max_relative_slip_m: 0.04
+  max_pre_release_error_m: 0.05
+  handle_collision_displacement_m: 0.02
