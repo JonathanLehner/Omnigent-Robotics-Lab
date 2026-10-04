@@ -1,6 +1,6 @@
-# ORAIL frontend
+# Opal Labs frontend
 
-A dependency-free, Vercel-deployable frontend for the lab-v1 robotics repository. Place this entire `frontend/` directory at the repository root.
+A dependency-free, Vercel-deployable Opal Labs frontend for the lab-v1 robotics repository. Place this entire `frontend/` directory at the repository root.
 
 ## Run locally
 

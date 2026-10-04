@@ -93,3 +93,263 @@ body:not([data-screen="home"]) main>.section{flex:1;min-height:0;overflow:auto;o
 .agent-hub p,.agent-hub .model{color:#d5e2f9}
 .hub-eyebrow{font-size:8px;letter-spacing:1.2px;margin-bottom:10px;color:#b9cef5}
 @media(max-width:650px){.agent-grid.agent-flow{grid-template-columns:1fr;grid-template-rows:none;gap:12px;padding:18px;min-height:0}.agent-connections{display:none}.agent-hub{grid-row:1}.agent-flow-card,.agent-hub{padding:22px}.agent-flow-card h3,.agent-hub h3{font-size:18px}}
+
+/* Brief, illustrative agent workflow before entering the demo. */
+.workflow-loading{width:min(590px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid #e2e5eb;border-radius:25px;background:#fafbfd;color:#192023;padding:32px 36px;box-shadow:0 25px 100px #07152b25}
+.workflow-loading::backdrop{background:#07152b70;backdrop-filter:blur(8px)}
+.workflow-heading{display:flex;align-items:center;gap:14px}
+.workflow-heading h2{font-size:25px;letter-spacing:-.7px;font-weight:600;margin:0}
+.workflow-caption{color:#78818f;font-size:12px;margin:10px 0 24px}
+.workflow-spinner,.workflow-steps .active .workflow-icon{border:2px solid #163b8520;border-top-color:#163b85;border-radius:50%;animation:workflow-spin .8s linear infinite}
+.workflow-spinner{width:23px;height:23px;flex:none}
+.workflow-steps{list-style:none;padding:0;margin:0;display:grid;gap:18px}
+.workflow-steps li{display:flex;gap:16px;align-items:center;color:#8c95a3;opacity:.38;transition:opacity .2s,color .2s}
+.workflow-steps li.active,.workflow-steps li.done{opacity:1}
+.workflow-steps li.active{color:#192023}
+.workflow-steps li.done{color:#52616e}
+.workflow-icon{width:22px;height:22px;flex:none}
+.workflow-steps .done .workflow-icon{border:1.5px solid #21aa72;color:#21aa72;border-radius:50%;display:grid;place-items:center;font-size:15px;line-height:1}
+.workflow-steps strong{display:block;font-size:13px;font-weight:600}
+.workflow-steps li div>span{display:block;font-size:12px;margin-top:2px}
+.workflow-bottom{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:26px;padding-top:18px;border-top:1px solid #e2e5eb}
+.workflow-status{font-size:10px;color:#687587}
+.workflow-skip{background:transparent;border:0;padding:6px 0;color:#163b85;font-size:11px;white-space:nowrap}
+@keyframes workflow-spin{to{transform:rotate(360deg)}}
+@media(max-width:650px){.workflow-loading{padding:25px 22px;border-radius:20px}.workflow-heading h2{font-size:21px}.workflow-steps{gap:14px}.workflow-bottom{align-items:flex-start;flex-direction:column}.workflow-caption{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.workflow-spinner,.workflow-steps .active .workflow-icon{animation:none}.workflow-steps li{transition:none}}
+
+/* Three individual objects: each brick can be picked up and moved. */
+.block-playground{position:relative;width:100%;aspect-ratio:520/500;overflow:visible}
+.landing-art .block-shadow{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.landing-block{position:absolute;display:block;width:42.3077%;height:39%;padding:0;border:0;background:transparent;line-height:0;touch-action:none;user-select:none;-webkit-user-select:none;isolation:isolate}
+.landing-block svg{width:100%;height:100%;display:block;overflow:visible;pointer-events:none}
+.block-0{left:46.1538%;top:44%}
+.block-1{left:11.5385%;top:43%}
+.block-2{left:28.8462%;top:19%}
+.landing-block.is-grabbed{z-index:30;filter:drop-shadow(0 18px 13px #071d4b40)}
+.landing-block.is-snapping{transition:transform .25s cubic-bezier(.22,1,.36,1)}
+.blocks-hint{display:block;text-align:center;color:#8a94a5;font-size:10px;letter-spacing:.5px;margin-top:-16px;pointer-events:none}
+@media(max-width:650px){.hero{grid-template-columns:1fr;align-content:center;gap:10px}.landing-art{position:relative;width:min(65vw,280px);right:auto;top:auto;opacity:1;pointer-events:auto;justify-self:center;margin-top:-12px}.hero h1.landing-logo{width:145px;margin:12px 0}.hero-bottom{gap:16px}.hero-bottom p{font-size:17px}.blocks-hint{font-size:9px;margin-top:-10px}}
+@media(max-height:620px) and (min-width:651px){.landing-art .landing-block svg{height:100%}.landing-art .block-shadow{height:100%}}
+@media(max-height:680px) and (max-width:650px){.landing-art{width:180px}.hero .eyebrow{font-size:8px}.hero h1.landing-logo{width:100px;margin:8px 0}.hero-bottom p{font-size:14px}.hero .primary{padding:12px 20px}.hero-bottom{gap:10px}.blocks-hint{display:none}}
+@media(prefers-reduced-motion:reduce){.landing-block.is-snapping{transition:none}}
+
+/* Crisp faces and persistent front-to-back ordering after a drop. */
+.block-0{z-index:1}.block-1{z-index:2}.block-2{z-index:3}
+.landing-block svg{shape-rendering:geometricPrecision}
+.landing-block.is-grabbed{filter:drop-shadow(0 6px 3px #071d4b24)}
+.blocks-hint{display:none}
+
+/* Industrial typography inspired by the Polymer reference. */
+:root{--body-font:"IBM Plex Mono","SFMono-Regular",Consolas,"Liberation Mono",monospace}
+body{font-family:var(--body-font);font-weight:400;font-kerning:normal}
+button,input,select,textarea,code{font-family:var(--body-font)}
+.hero-bottom p{font-size:clamp(16px,1.5vw,21px);line-height:1.55}
+.hero .primary{font-size:11px;letter-spacing:1.3px}
+.eyebrow,.model,.hub-eyebrow{font-weight:500}
+.workflow-heading h2{font-size:22px;line-height:1.3}
+.workflow-steps strong{font-size:12px}
+.workflow-steps li div>span{font-size:11px;line-height:1.5}
+.agent-flow-card h3,.agent-hub h3{font-size:clamp(14px,1.2vw,18px);font-weight:600}
+.agent-flow-card p,.agent-hub p{font-size:11px;line-height:1.6}
+@media(max-width:650px){.hero-bottom p{font-size:16px}.workflow-heading h2{font-size:18px}.agent-flow-card h3,.agent-hub h3{font-size:16px}}
+@media(max-height:680px) and (max-width:650px){.hero-bottom p{font-size:13px}}
+
+/* A quiet simulation floor, with the lab's real Spot arm geometry. */
+body[data-screen="home"]{background:#f7f9fc;background-image:none;isolation:isolate}
+body[data-screen="home"]::before{content:"";position:fixed;inset:46% -35% -80%;z-index:-1;pointer-events:none;background:repeating-conic-gradient(#c7d2e13d 0% 25%,#edf1f83d 0% 50%) 0 0/100px 100px;transform:perspective(650px) rotateX(57deg);transform-origin:50% 0;mask-image:linear-gradient(transparent,#000 22%,#000);opacity:.65}
+body[data-screen="home"]::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 25% 35%,#f7f9fc 0%,#f7f9fcdb 28%,transparent 70%),linear-gradient(#f7f9fc 8%,transparent 65%)}
+.landing-robot-arm{position:absolute;left:-5%;top:8%;width:95%;height:auto;z-index:0;pointer-events:none;user-select:none;filter:drop-shadow(0 16px 8px #22355016)}
+.landing-block{width:32%;height:29.5%}
+.block-0{left:64%;top:65%}.block-1{left:38%;top:64%}.block-2{left:51%;top:46%}
+.block-playground{isolation:isolate}
+@media(max-width:650px){.landing-art{width:min(75vw,310px);margin-top:0}body[data-screen="home"]::before{inset:55% -70% -60%;background-size:65px 65px}}
+@media(max-height:680px) and (max-width:650px){.landing-art{width:205px}}
+
+/* More visible simulation floor. */
+body[data-screen="home"]::before{opacity:.95;background:repeating-conic-gradient(#a8bdd560 0% 25%,#e4ebf560 0% 50%) 0 0/100px 100px}
+body[data-screen="home"]::after{background:radial-gradient(ellipse at 23% 30%,#f7f9fc 0%,#f7f9fca8 25%,transparent 68%),linear-gradient(#f7f9fc 4%,transparent 58%)}
+/* Terminal boot sequence inspired by the reference recording. */
+.workflow-loading{width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;border:0;border-radius:0;padding:30px;background:#090d13;color:#e9edf5;box-shadow:none}
+.workflow-loading[open]{display:flex;align-items:center;justify-content:center}
+.workflow-loading::backdrop{background:#090d13}
+.workflow-terminal{width:min(660px,100%);min-height:490px;display:flex;flex-direction:column}
+.workflow-boot-brand{font-size:11px;letter-spacing:2px;color:#7ba3f0;margin-bottom:26px}
+.workflow-heading h2{font-size:23px;color:#e9edf5;letter-spacing:-.5px}
+.workflow-heading .workflow-spinner{display:none}
+.workflow-caption{font-size:10px;color:#7d889a;margin:12px 0 32px}
+.workflow-steps{gap:16px;flex:1}
+.workflow-steps li{display:none;grid-template-columns:14px minmax(0,1fr) 65px;gap:10px;align-items:start;opacity:1;color:#d7deeb}
+.workflow-steps li.active,.workflow-steps li.done{display:grid}
+.workflow-steps .workflow-icon,.workflow-steps .active .workflow-icon,.workflow-steps .done .workflow-icon{width:auto;height:auto;border:0;animation:none;background:none;border-radius:0;display:block;font-size:12px;color:#719ced}
+.workflow-steps strong{font-size:11px;font-weight:500;color:#d7deeb}
+.workflow-steps li div>span{font-size:10px;color:#8a97ad;min-height:15px}
+.workflow-steps .active div>span::after{content:"▌";color:#8fb1f6;animation:boot-caret .65s steps(1) infinite}
+.workflow-row-state{font-size:9px;letter-spacing:1px;color:#728199;padding-top:2px;text-align:right}
+.workflow-steps .done .workflow-row-state{color:#8ad4b4}
+.workflow-bottom{border-color:#ffffff18;margin-top:25px}
+.workflow-status{color:#8393aa;font-size:9px}
+.workflow-skip{color:#b7ccf7}
+@keyframes boot-caret{50%{opacity:0}}
+@media(max-width:650px){.workflow-loading{padding:24px}.workflow-terminal{min-height:470px}.workflow-heading h2{font-size:19px}.workflow-steps{gap:13px}.workflow-steps li{grid-template-columns:12px minmax(0,1fr) 55px}.workflow-row-state{font-size:8px}body[data-screen="home"]::before{background-size:65px 65px}}
+@media(max-height:620px){.workflow-terminal{min-height:0}.workflow-steps{gap:9px}.workflow-boot-brand{margin-bottom:12px}.workflow-caption{margin-bottom:18px}}
+@media(prefers-reduced-motion:reduce){.workflow-steps .active div>span::after{animation:none}}
+
+.powered-by{display:flex;flex-direction:column;gap:12px;margin-top:-10px}
+.powered-by-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#687587}
+.powered-by-brands{display:flex;align-items:center;gap:23px}
+.powered-brand{display:block;mix-blend-mode:multiply;user-select:none;pointer-events:none}
+.databricks-brand{width:125px}.databricks-brand svg{display:block;width:100%;height:auto}
+.omnigent-brand{width:130px}.omnigent-brand img{display:block;width:100%;height:auto}
+@media(max-width:650px){.powered-by{gap:9px;margin-top:0}.powered-by-brands{gap:18px}.databricks-brand{width:108px}.omnigent-brand{width:115px}}
+@media(max-height:680px) and (max-width:650px){.powered-by{gap:5px}.databricks-brand{width:90px}.omnigent-brand{width:95px}.powered-by-label{font-size:8px}}
+
+/* White surround and a terminal with stable spacing, growing logs upward. */
+body[data-screen="home"]::before{opacity:.82}
+.workflow-loading{background:#fff;padding:24px}
+.workflow-loading::backdrop{background:#fff}
+.workflow-terminal{width:min(690px,100%);height:min(570px,calc(100dvh - 48px));min-height:0;background:#10151e;border:1px solid #202a39;border-radius:12px;overflow:hidden;box-shadow:0 25px 70px #17243a20;padding:0 28px 22px}
+.terminal-chrome{height:42px;min-height:42px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:#19202b;margin:0 -28px 24px;padding:0 18px;border-bottom:1px solid #ffffff0c;color:#8793a7;font-size:10px}
+.terminal-dots{display:flex;gap:7px;width:44px}.terminal-dots i{width:8px;height:8px;border-radius:50%;background:#ec6a5e}.terminal-dots i:nth-child(2){background:#e8bd4f}.terminal-dots i:nth-child(3){background:#61c454}.terminal-chrome-end{width:44px}
+.workflow-boot-brand{margin-bottom:14px;font-size:9px}
+.workflow-heading h2{font-size:20px}
+.workflow-caption{margin:10px 0 20px;font-size:9px}
+.workflow-steps{display:flex;flex-direction:column;justify-content:flex-end;gap:10px;min-height:0;overflow:hidden;flex:1}
+.workflow-steps li{flex-shrink:0;min-height:40px;margin:0}
+.workflow-steps strong{line-height:15px}.workflow-steps li div>span{line-height:15px}
+.workflow-bottom{flex:none;min-height:30px;margin-top:18px;padding-top:14px}
+@media(max-width:650px){.workflow-loading{padding:16px}.workflow-terminal{height:min(570px,calc(100dvh - 32px));padding:0 18px 18px}.terminal-chrome{margin:0 -18px 20px}.workflow-heading h2{font-size:17px}.workflow-steps{gap:10px}.workflow-steps li{min-height:40px}.workflow-bottom{margin-top:14px}}
+@media(max-height:620px){.workflow-boot-brand{display:none}.workflow-caption{margin-bottom:12px}.terminal-chrome{margin-bottom:16px}.workflow-heading h2{font-size:17px}}
+
+/* Linux-style terminal chrome and an Opal research prompt. */
+.workflow-terminal{width:min(900px,100%);height:min(670px,calc(100dvh - 48px));background:#1c1c1c;border:1px solid #303030;border-radius:15px;padding:0 34px 24px;box-shadow:0 25px 80px #17243a24}
+.terminal-chrome{position:relative;height:64px;min-height:64px;margin:0 -34px;padding:0 18px;background:#111;border:0;font-size:18px;color:#d9d9d9}
+.terminal-app-title{position:absolute;left:50%;transform:translateX(-50%);font-size:17px;font-weight:600;letter-spacing:-.5px}
+.terminal-new,.terminal-window-icons i{background:#282828;border-radius:7px;display:grid;place-items:center;width:32px;height:32px;font-style:normal;color:#c4c4c4;font-size:23px}
+.terminal-new{width:36px;height:36px}
+.terminal-window-icons{display:flex;gap:6px;pointer-events:none}
+.terminal-tab{display:flex;align-items:center;gap:16px;height:45px;min-height:45px;margin:0 -34px 28px;padding:0 27px;background:#262626;color:#aeb5bd;font-size:12px}
+.terminal-tab span{font-size:21px;color:#929292}
+.workflow-boot-brand{display:none}
+.workflow-heading h2{font-size:19px;font-weight:400;letter-spacing:0;color:#c9c9c9;margin:0}
+.workflow-caption{font-size:9px;color:#747f8e;margin:9px 0 23px}
+.terminal-command{display:flex;gap:16px;align-items:flex-start;margin-bottom:24px;color:#c9c9c9;font-size:15px;line-height:1.65}
+.terminal-command>span{color:#00b8e6;flex:none}.terminal-command p{margin:0}
+.workflow-steps{gap:13px}
+.workflow-steps li{min-height:45px}
+.workflow-steps .workflow-icon,.workflow-steps .active .workflow-icon,.workflow-steps .done .workflow-icon{color:#00b8e6}
+.workflow-steps strong{font-size:12px;line-height:18px;color:#c4c9d0;font-weight:400}
+.workflow-steps li div>span{font-size:12px;line-height:18px;color:#949494}
+.workflow-steps .active div>span::after{color:#d1d1d1}
+.workflow-row-state{font-size:9px;color:#949494}.workflow-steps .done .workflow-row-state{color:#99b8ac}
+.workflow-bottom{border-color:#ffffff12}
+@media(max-width:650px){.workflow-terminal{height:min(670px,calc(100dvh - 32px));padding:0 20px 18px}.terminal-chrome{margin:0 -20px;height:54px;min-height:54px;padding:0 12px}.terminal-app-title{font-size:14px}.terminal-window-icons{gap:4px}.terminal-window-icons i{width:23px;height:25px;font-size:18px}.terminal-window-icons i:first-child,.terminal-window-icons i:nth-child(2){display:none}.terminal-new{width:28px;height:28px;font-size:21px}.terminal-tab{margin:0 -20px 22px;padding:0 18px;font-size:10px}.workflow-heading h2{font-size:15px}.terminal-command{font-size:12px;gap:12px;margin-bottom:18px}.workflow-steps strong,.workflow-steps li div>span{font-size:10px}.workflow-steps{gap:10px}.workflow-steps li{min-height:43px}}
+@media(max-height:620px){.terminal-tab{margin-bottom:16px;height:36px;min-height:36px}.workflow-caption{margin-bottom:14px}.terminal-command{font-size:12px;margin-bottom:14px}.workflow-steps li{min-height:40px}.workflow-steps{gap:9px}}
+
+/* Moving packets illustrate the configured agent handoffs. */
+.agent-flow-packet{filter:drop-shadow(0 0 3px #4aaed055)}
+.agent-connections>g:nth-of-type(2){animation:agent-handoff-dashes 2.4s linear infinite}
+@keyframes agent-handoff-dashes{to{stroke-dashoffset:-24}}
+/* Keep the initial block stack beneath and in front of the arm. */
+.landing-block{width:30%;height:27.6923%}
+.block-0{left:58%;top:70.5%}
+.block-1{left:28%;top:70%}
+.block-2{left:43%;top:52%}
+@media(prefers-reduced-motion:reduce){.agent-flow-packet{display:none}.agent-connections>g:nth-of-type(2){animation:none}}
+
+@media(pointer:fine){.powered-brand{pointer-events:auto}.powered-brand svg,.powered-brand img{pointer-events:none}.hero .eyebrow .play-word,.powered-by-label .play-word{vertical-align:baseline}}
+
+/* Omnigent pink accents and a clean agent diagram. */
+.terminal-command>span,.workflow-steps .workflow-icon,.workflow-steps .active .workflow-icon,.workflow-steps .done .workflow-icon{color:#e14c9c}
+.workflow-steps .active div>span::after{color:#e14c9c}
+.agent-grid.agent-flow{background:transparent;border:0;box-shadow:none}
+.agent-flow-card{background:#fff;border-color:#d9dde4;box-shadow:none}
+.agent-connections>g{stroke:#b5bdc9}
+.agent-connections>g:nth-of-type(2){stroke-dasharray:none;animation:none}
+#agent-arrow path{fill:#b5bdc9}
+.agent-flow-chevron{filter:none}
+@media(prefers-reduced-motion:reduce){.agent-flow-chevron{display:none}}
+
+/* Shift the block stack slightly left of the gripper. */
+.block-0{left:53%}.block-1{left:23%}.block-2{left:38%}
+
+/* A more compact terminal preview. */
+.workflow-terminal{width:min(650px,100%);height:min(490px,calc(100dvh - 48px));padding:0 24px 18px}
+.terminal-chrome{height:49px;min-height:49px;margin:0 -24px;padding:0 14px}
+.terminal-app-title{font-size:15px}
+.terminal-new{width:29px;height:29px;font-size:20px}
+.terminal-window-icons i{width:26px;height:26px;font-size:20px}
+.terminal-tab{height:36px;min-height:36px;margin:0 -24px 20px;padding:0 22px;font-size:10px}
+.workflow-heading h2{font-size:16px}
+.workflow-caption{margin:8px 0 16px}
+.terminal-command{font-size:12px;line-height:1.65;gap:12px;margin-bottom:18px}
+.workflow-steps{gap:9px}
+.workflow-steps li{min-height:39px}
+.workflow-steps strong,.workflow-steps li div>span{font-size:11px;line-height:16px}
+.workflow-bottom{margin-top:13px;padding-top:11px;min-height:26px}
+@media(max-width:650px){.workflow-terminal{width:min(520px,100%);height:min(490px,calc(100dvh - 32px));padding:0 18px 16px}.terminal-chrome{margin:0 -18px}.terminal-tab{margin:0 -18px 16px;padding:0 18px}.workflow-heading h2{font-size:14px}.terminal-command{font-size:11px}.workflow-steps strong,.workflow-steps li div>span{font-size:10px}}
+
+/* Dark agent cards around an outlined Omnigent hub. */
+.agent-flow-card{background:#202020;border:1px solid #202020;border-radius:4px;color:#fff;box-shadow:none}
+.agent-flow-card h3{color:#fff}
+.agent-flow-card p{color:#bfc0c4}
+.agent-hub{background:#fff;border:1.5px solid #202020;border-radius:4px;color:#202020;box-shadow:none}
+.agent-hub h3{color:#202020}
+.agent-hub p{color:#62666e}
+.agent-hub .hub-eyebrow{color:#767a82}
+.agent-connections>g{stroke:#929292;stroke-width:1.5}
+.agent-connections>g:nth-of-type(2){stroke-dasharray:1 7;stroke-linecap:round;animation:none}
+#agent-arrow path{fill:#929292}
+
+/* A tighter three-block stack, positioned beneath the arm like the reference. */
+.block-0{left:46.7%;top:70.5%}
+.block-1{left:23%;top:70%}
+.block-2{left:34.4%;top:53.4%}
+
+/* Carry one blue sweep across the terminal-to-workspace handoff. */
+.workflow-loading{isolation:isolate;overflow:hidden}
+.workflow-terminal{position:relative;z-index:2}
+.workflow-loading.is-finishing .workflow-terminal{animation:terminal-transition-out .65s ease forwards}
+.workspace-transition{position:fixed;inset:0;z-index:99998;pointer-events:none;overflow:hidden;background:radial-gradient(ellipse at 15% 95%,#72d5ff 0%,#2266d0 20%,transparent 50%),radial-gradient(ellipse at 100% 0%,#1c4fa3 0%,transparent 52%),linear-gradient(145deg,#00102f 10%,#092759 65%,#16478f);animation:workspace-blue-cover .65s ease forwards}
+.workspace-transition::after{content:"";position:absolute;inset:-100%;background:linear-gradient(125deg,transparent 43%,#b9deff33 49%,transparent 55%);animation:workspace-blue-sweep 1.4s ease both}
+.workspace-transition.is-revealing{animation:workspace-blue-clear .75s ease forwards}
+body.is-revealing-workspace main{animation:workspace-transition-in .75s ease both}
+@keyframes terminal-transition-out{to{opacity:0;transform:translateY(-8px)}}
+@keyframes workspace-blue-cover{from{opacity:0}to{opacity:.78}}
+@keyframes workspace-blue-clear{from{opacity:.78}to{opacity:0}}
+@keyframes workspace-blue-sweep{from{transform:translateX(-28%);opacity:0}25%{opacity:1}to{transform:translateX(28%);opacity:0}}
+@keyframes workspace-transition-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.workspace-transition{display:none}.workflow-loading.is-finishing .workflow-terminal,body.is-revealing-workspace main{animation:none}}
+
+/* Keep the same research sequence when the diagram becomes a mobile list. */
+@media(max-width:650px){
+.agent-flow>article:nth-of-type(1){order:1}
+.agent-flow>article:nth-of-type(2){order:2}
+.agent-flow>article:nth-of-type(3){order:3}
+.agent-flow>article:nth-of-type(6){order:4}
+.agent-flow>article:nth-of-type(9){order:5}
+.agent-flow>article:nth-of-type(8){order:6}
+.agent-flow>article:nth-of-type(7){order:7}
+.agent-flow>article:nth-of-type(4){order:8}
+.agent-flow>.agent-hub{order:0}
+}
+
+/* White specialist cards and one black orchestration hub. */
+.agent-flow-card{background:#fff;border:1.5px solid #202020;color:#202020}
+.agent-flow-card h3{color:#202020}
+.agent-flow-card p{color:#62666e}
+.agent-hub{background:#202020;border-color:#202020;color:#fff}
+.agent-hub h3{color:#fff}
+.agent-hub p{color:#bfc0c4}
+.agent-hub .hub-eyebrow{color:#bfc0c4}
+.agent-flow-chevron{stroke:#163b85}
+
+/* Compact brand lockup doubles as the navigation's home button. */
+.lab-nav .nav-home-logo{display:inline-flex;align-items:center;gap:9px;flex-shrink:0;line-height:0;padding:4px 0}
+.nav-logo-bricks{width:30px;height:24px;display:block;flex:none}
+.nav-logo-words{display:flex;align-items:center;gap:4px}
+.nav-logo-words svg{display:block;height:18px;width:auto;overflow:hidden}
+.nav-logo-words svg:first-child{width:44.2px}
+.nav-logo-words svg:last-child{width:48.2px}
+.nav-home-logo:focus-visible{outline:2px solid #163b85;outline-offset:5px;border-radius:2px}
+@media(max-width:650px){.lab-nav .nav-home-logo{gap:6px}.nav-logo-bricks{width:22px;height:20px}.nav-logo-words{gap:3px}.nav-logo-words svg{height:14px}.nav-logo-words svg:first-child{width:34.4px}.nav-logo-words svg:last-child{width:37.5px}}
