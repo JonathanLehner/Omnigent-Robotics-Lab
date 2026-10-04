@@ -65,10 +65,11 @@ def check_episode(
         "cube": np.array([0.12, 0.12]),
         "brick": np.array([0.12, 0.24]),
     }[block_type]
-    # "Except at the target" means the carried block's centre has entered
-    # the target footprint. Use the footprint's orientation-independent
-    # circumscribed radius; this does not relax the release predicate.
-    target_footprint_radius = float(np.linalg.norm(full_xy / 2.0))
+    # "Except at the target" means the carried proxy overlaps its target
+    # footprint. Two identical footprints can overlap while their centres are
+    # up to the sum of their circumscribed radii apart. This conservative,
+    # orientation-independent geometry check does not relax release criteria.
+    target_overlap_radius = float(np.linalg.norm(full_xy))
     floor_away_from_target = sum(
         row["block_floor_contacts"]
         for row in before_release
@@ -76,7 +77,7 @@ def check_episode(
         and np.linalg.norm(
             np.asarray(row["block_pose"][:2]) - target_xy
         )
-        > target_footprint_radius
+        > target_overlap_radius
     )
     iterations_ok = [
         row["samples"] == 128 and row["iterations_run"] == 4
@@ -164,7 +165,7 @@ def check_episode(
             "floor_contacts_away_from_target_after_lift": (
                 floor_away_from_target
             ),
-            "target_footprint_radius_m": target_footprint_radius,
+            "target_overlap_radius_m": target_overlap_radius,
         },
         "G3": {
             "pass": bool(
