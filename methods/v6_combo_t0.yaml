@@ -7,7 +7,7 @@ idealizations:
   - sumo_to_assembly_state_bridge
   - fixed_nominal_walk_start
 arm_block_collision: false
-max_workers: 1
+max_workers: 6
 stages:
   perceive: vlm
   plan_order: support_sort

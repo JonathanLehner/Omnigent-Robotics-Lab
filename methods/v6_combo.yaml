@@ -13,7 +13,7 @@ idealizations:
   - z_from_layer
   - known_target_camera
 arm_block_collision: false
-max_workers: 1
+max_workers: 6
 stages:
   perceive: vlm_measure_anchored
   plan_order: support_sort

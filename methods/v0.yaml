@@ -3,6 +3,7 @@ name: v0
 rung: 0
 idealizations: [oracle_structure_spec, oracle_build_order, fixed_base, weld_grasp, scripted_arm, no_arm_block_collision]
 arm_block_collision: false
+max_workers: 6
 stages:
   perceive: oracle
   plan_order: oracle
