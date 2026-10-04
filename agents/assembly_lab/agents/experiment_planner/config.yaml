@@ -3,10 +3,10 @@ name: experiment_planner
 description: Decides which test to run next - at least two candidate experiments scored on learning, cost, feasibility; selects one.
 executor:
   type: omnigent
+  model: sonnet
+  reasoning_effort: medium
   config:
     harness: claude-sdk
-    model: sonnet
-    reasoning_effort: medium
 prompt: |
   You are the experiment planner. You own one decision: which test to run next.
   For the open hypotheses the PI points you to, design AT LEAST TWO competing candidate experiments with

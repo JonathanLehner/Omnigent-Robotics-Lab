@@ -24,7 +24,7 @@ R0/T0 1.00 [0.61, 1.00] n=6 (R-023); R0/T1 1.00 [0.76, 1.00] n=12 (R-023); R0/T2
 - **X-014** (149/306 episodes run): v4_place, seeds 0-7, on all 34 T1/T2/T3 dev scenes (272). Control is v0 at matched scenes and seeds 0-7, reused from R-005 (T1-01..06), R-007 (T2-01..06), R-012. Tests -.
 - **X-022** (0/24 episodes run): Rung-4 MPC T0 probe, run SERIALLY after X-019 finishes. Run v4_mpc (Sumo CEM placement; cost = block pose + upright + collision clearance + settle velocity + an. Tests -.
 - **X-025** (0/96 episodes run): Full pre-registered design. v3_grasp_lift (release_vertical_lift_m 0.125, 12 steps, no oracle correction, default physics) at seeds 0-7 on T0-dev-01..06 and T1-. Tests H-010.
-- **X-035** (0/40 episodes run): v2_walk (w_heading=160, frozen) vs fresh matched v0 control. Tests H-012.
+- **X-035** (5/40 episodes run): v2_walk (w_heading=160, frozen) vs fresh matched v0 control. Tests H-012.
 - **X-037** (0/72 episodes run): v46_vlm_measure vs v0. PART A (40 eps, all fresh v46): T1-dev-01..12 (confirmatory) + old off-grid T2-dev-11..14, T3-dev-13..16 (exploratory), seeds 0-1. v0 con. Tests H-013.
 
 ## Hypotheses
@@ -52,15 +52,15 @@ Use v45 (VLM structure + closed-loop placement) for rung-5 on T1 grid-aligned sc
 
 **Next:** H-013 Gate 0 (free, pixel-only measurement, 20 scenes). If it passes: v46_vlm_measure vs v0 on T1-dev-01..12 + 8 off-grid T2/T3 scenes, seeds 0-1, 40 episodes, on committed code. In parallel, once the human commits the tree and reloads the server: X-035 clean rung-2 test (32 episodes, H-014).
 
-**Budget:** 1387 of 1500 episodes used, 113 left. Record: 9 evidence, 14 hypotheses, 39 experiments, 46 runs, 14 results, 9 decisions.
+**Budget:** 1392 of 1500 episodes used, 108 left. Record: 9 evidence, 14 hypotheses, 39 experiments, 51 runs, 14 results, 9 decisions.
 
 ## Recent runs (videos inside)
 
+- R-051 v2_walk (rung 2), T0: 1.00, failures {} - runs/1791084169_v2_walk [▶ T0-dev-05_s4](runs/1791084169_v2_walk/T0-dev-05_s4.gif)
+- R-050 v2_walk (rung 2), T0: 1.00, failures {} - [runs/1791084148_v2_walk/RUN.md](runs/1791084148_v2_walk/RUN.md) [▶ T0-dev-04_s3](runs/1791084148_v2_walk/T0-dev-04_s3.gif)
+- R-049 v2_walk (rung 2), T0: 1.00, failures {} - [runs/1791084126_v2_walk/RUN.md](runs/1791084126_v2_walk/RUN.md) [▶ T0-dev-03_s2](runs/1791084126_v2_walk/T0-dev-03_s2.gif)
+- R-048 v2_walk (rung 2), T0: 1.00, failures {} - [runs/1791084104_v2_walk/RUN.md](runs/1791084104_v2_walk/RUN.md) [▶ T0-dev-02_s1](runs/1791084104_v2_walk/T0-dev-02_s1.gif)
+- R-047 v2_walk (rung 2), T0: 1.00, failures {} - [runs/1791084076_v2_walk/RUN.md](runs/1791084076_v2_walk/RUN.md) [▶ T0-dev-01_s0](runs/1791084076_v2_walk/T0-dev-01_s0.gif)
 - R-046 v2_walk (rung 2), T1: 1.00, failures {} - [runs/1791082144_v2_walk/RUN.md](runs/1791082144_v2_walk/RUN.md) [▶ T1-dev-03_s0](runs/1791082144_v2_walk/T1-dev-03_s0.gif) [▶ T1-dev-04_s0](runs/1791082144_v2_walk/T1-dev-04_s0.gif) [▶ T1-dev-05_s0](runs/1791082144_v2_walk/T1-dev-05_s0.gif)
 - R-045 v2_walk (rung 2), T0: 1.00, failures {} - [runs/1791082102_v2_walk/RUN.md](runs/1791082102_v2_walk/RUN.md) [▶ T0-dev-02_s1](runs/1791082102_v2_walk/T0-dev-02_s1.gif)
 - R-044 v2_walk (rung 2), T0: 1.00, failures {} - [runs/1791082081_v2_walk/RUN.md](runs/1791082081_v2_walk/RUN.md) [▶ T0-dev-02_s1](runs/1791082081_v2_walk/T0-dev-02_s1.gif)
-- R-043 v2_walk (rung 2), T1: 1.00, failures {} - [runs/1791081914_v2_walk/RUN.md](runs/1791081914_v2_walk/RUN.md) [▶ T1-dev-02_s0](runs/1791081914_v2_walk/T1-dev-02_s0.gif)
-- R-042 v2_walk (rung 2), T1: 1.00, failures {} - [runs/1791081862_v2_walk/RUN.md](runs/1791081862_v2_walk/RUN.md) [▶ T1-dev-01_s0](runs/1791081862_v2_walk/T1-dev-01_s0.gif)
-- R-041 v2_walk (rung 2), T0: 1.00, failures {} - [runs/1791081771_v2_walk/RUN.md](runs/1791081771_v2_walk/RUN.md) [▶ T0-dev-06_s0](runs/1791081771_v2_walk/T0-dev-06_s0.gif)
-- R-040 v2_walk (rung 2), T0: 1.00, failures {} - [runs/1791081696_v2_walk/RUN.md](runs/1791081696_v2_walk/RUN.md) [▶ T0-dev-05_s0](runs/1791081696_v2_walk/T0-dev-05_s0.gif)
-- R-039 v2_walk (rung 2), T0: 1.00, failures {} - [runs/1791081628_v2_walk/RUN.md](runs/1791081628_v2_walk/RUN.md) [▶ T0-dev-04_s0](runs/1791081628_v2_walk/T0-dev-04_s0.gif)

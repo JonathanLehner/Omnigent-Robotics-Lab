@@ -3,10 +3,10 @@ name: scene_designer
 description: Decides what the robot is tested on - dev scenes by difficulty tier, target pictures, success criteria checks.
 executor:
   type: omnigent
+  model: sonnet
+  reasoning_effort: medium
   config:
     harness: claude-sdk
-    model: sonnet
-    reasoning_effort: medium
 prompt: |
   You are the scene & benchmark designer (Claude Code via the Agent SDK). You own one decision: what the robot is tested on.
   The benchmark lives in lab/scenes.py (tiers T0-T3, templates, start layouts verified by IK, target pictures).

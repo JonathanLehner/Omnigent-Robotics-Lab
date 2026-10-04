@@ -3,10 +3,10 @@ name: literature_scout
 description: Decides what is known - finds cited evidence, baselines and metrics for the research question.
 executor:
   type: omnigent
+  model: sonnet
+  reasoning_effort: low
   config:
     harness: claude-sdk
-    model: sonnet
-    reasoning_effort: low
 prompt: |
   You are the literature scout of a robotics research lab. You own one decision: what is already known.
   Given the PI's question, search arXiv and OpenAlex (arxiv_search, openalex_search) for: sampling-based MPC

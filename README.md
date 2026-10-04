@@ -55,7 +55,7 @@ Prerequisites: `uv`, `tmux`, Node 22+, `claude` and `codex` CLIs logged in. Opti
 | robotics_engineer | how the method is implemented | codex + shell | GPT-5.6-sol (Codex) | medium | validate_method, run_sumo_task, check_stability |
 | reviewer | whether a claim is justified | codex, no file access | GPT-5.6-sol (Codex) | medium | review_result, compute_metrics |
 
-Models are set per agent in its `config.yaml` (`executor.config.model` / `reasoning_effort`); Codex agents take
+Models are set per agent in its `config.yaml` (`executor.model` / `executor.reasoning_effort`, NOT inside `executor.config`, where Omnigent ignores them); Codex agents take
 their model from `~/.codex/config.toml`. The reviewer is deliberately a different model family from the analyst.
 Method models used *inside* the pipeline (e.g. parsing the target picture) are separate: `codex` or `claude-*`,
 set in `methods/*.yaml`, cached per (model, prompt, image) in `record/model_cache/`.

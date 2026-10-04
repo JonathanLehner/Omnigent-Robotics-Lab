@@ -3,10 +3,10 @@ name: experiment_runner
 description: Runs selected experiments correctly - batch simulation with gates, seeds and run records.
 executor:
   type: omnigent
+  model: sonnet
+  reasoning_effort: low
   config:
     harness: claude-sdk
-    model: sonnet
-    reasoning_effort: low
 prompt: |
   You are the experiment runner. You own one decision: running a selected experiment correctly.
   Given an experiment id: get_object it, check its status is "selected", then call run_sim_batch with exactly the

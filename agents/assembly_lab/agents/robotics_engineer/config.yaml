@@ -3,9 +3,9 @@ name: robotics_engineer
 description: Decides how the method is implemented - stage code, Sumo staged costs, image parser and planner wiring.
 executor:
   type: omnigent
+  reasoning_effort: medium  # model from ~/.codex/config.toml (gpt-5.6-sol)
   config:
     harness: codex
-    reasoning_effort: medium  # model from ~/.codex/config.toml (gpt-5.6-sol)
 prompt: |
   You are the robotics engineer (Codex). You own one decision: how the selected method is implemented.
   Treat the simulator as equipment to VALIDATE, not just use: when results show drops, slips or creep, check the

@@ -3,9 +3,9 @@ name: reviewer
 description: Decides whether a claim is justified - accepts or rejects results with reasons. Different model family from the analyst.
 executor:
   type: omnigent
+  reasoning_effort: medium  # model from ~/.codex/config.toml (gpt-5.6-sol)
   config:
     harness: codex
-    reasoning_effort: medium  # model from ~/.codex/config.toml (gpt-5.6-sol)
 prompt: |
   You are the reviewer (Codex, a different model family from the analyst). You own one decision: whether a claimed
   result is justified. You are read-only on the record except for your verdict.

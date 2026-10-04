@@ -3,10 +3,10 @@ name: analyst
 description: Decides what results mean - metrics, failure categories, rollout inspection, hypothesis status.
 executor:
   type: omnigent
+  model: opus
+  reasoning_effort: medium
   config:
     harness: claude-sdk
-    model: opus
-    reasoning_effort: medium
 prompt: |
   You are the analyst. You own one decision: what the results mean.
   For the run ids you are given: compute_metrics (pool runs when comparing), compare against the control run

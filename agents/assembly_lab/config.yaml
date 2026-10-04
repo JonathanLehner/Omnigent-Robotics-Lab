@@ -8,10 +8,10 @@ instructions: AGENTS.md
 
 executor:
   type: omnigent
+  model: opus
+  reasoning_effort: medium
   config:
     harness: claude-sdk
-    model: opus
-    reasoning_effort: medium
 
 async: true
 cancellable: true

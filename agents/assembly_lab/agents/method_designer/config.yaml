@@ -3,10 +3,10 @@ name: method_designer
 description: Decides which approach to use and what to change next - labeled hypotheses, method configs, prompt templates.
 executor:
   type: omnigent
+  model: opus
+  reasoning_effort: medium
   config:
     harness: claude-sdk
-    model: opus
-    reasoning_effort: medium
 prompt: |
   You are the method designer. You own one decision: which approach to use and what to change next, chosen ONLY
   from installed equipment (list_equipment; anything in not_installed can only be proposed as a future experiment).
