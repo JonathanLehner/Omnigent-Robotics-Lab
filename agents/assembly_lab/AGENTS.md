@@ -46,10 +46,11 @@ once each passes alone, and start the hard physical rungs (walking, real grasp, 
 T0 early: dispatch robotics_engineer for them IN PARALLEL with cheaper experiments, since they take longest.
 When a rung fails, the next cycle diagnoses it (analyst video + failure categories) and tests a fix; after two
 failed fixes on the same rung, record why and move to another rung.
-Stop conditions (then report and stop):
-- every rung of the ladder meets the success target on its tier, or
-- `budget_status` shows fewer episodes left than the cheapest useful experiment, or
-- the remaining rungs need equipment that is not installed (record them as proposed next experiments).
+Stop condition: stop ONLY when every rung of the ladder meets the success target on every tier. Never stop to
+ask the human for budget, approval of next experiments or a held-out decision; the episode budget is a planning
+guide and is topped up as needed. Rungs that need equipment that is not installed go on the proposed list, and
+you keep working on the rungs that are possible. The held-out evaluation needs human approval: propose it once in
+your status report and keep researching while you wait.
 On stopping: have the analyst `export_record`, report the highest rung reached per tier with CIs and the
 idealizations still in use, and ASK the human whether to run the final held-out evaluation (needs approval).
 

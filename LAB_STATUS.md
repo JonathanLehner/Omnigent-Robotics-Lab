@@ -52,6 +52,16 @@ R0/T0 1.00 [0.93, 1.00] n=48 (R-099); R0/T1 1.00 [0.93, 1.00] n=48 (R-099); R0/T
 | H-020 | 5 | supported | [Combined rungs 1+2+5 | agent hypothesis by method_designer | for X-049 | FILED BEFORE ANY v6_combo RUN, NO CODE WRITTEN. methods/v6_combo*. |
 | H-021 | 2 | open | [Rung 2 on T2/T3 | agent hypothesis by method_designer | for X-061 arm (a) | FILED BEFORE ANY X-061 RUN, NO CODE WRITTEN. Short pre-registra |
 | H-022 | 5 | supported | [Combined rungs 1+2+5 on T2/T3 | agent hypothesis by method_designer | SUCCESSOR of H-020 | for X-061 arm (b) | FILED BEFORE ANY X-061 RUN,  |
+| H-023 | 2 | open | SUCCESSOR TO H-016 (refuted, RS-023). Filed before any code or run.
+
+METHOD v2_walk_head = v2_walk_xy (candidate A) exactly as logged in R-0 |
+| H-024 | 3 | open | Successor to H-010 (refuted by RS-019). Filed before any code or run.
+PREMISE (RS-019): the release damage happens while the FINGERS OPEN, n |
+| H-025 | 5 | open | [Placement tail, combined method | agent hypothesis by method_designer | SUCCESSOR LINE of H-022 (D-018 next_experiment 3) | FILED BEFORE AN |
+| H-026 | 5 | open | [Rung 5 perception | agent hypothesis by method_designer | FILED BEFORE ANY CODE OR RUN for v47b]
+
+CLAIM: The remaining perception_structure |
+| H-027 | 4 | open | [Rung 4 | SUCCESSOR of H-018 (OPEN, untested: pre-run gate failed at 9cf673d, T0-dev-01 s100: G2c D_floor 2.38 cm, release forced at 8.0 s)  |
 
 ## Latest decision (D-018, cites RS-031, RS-030)
 
@@ -64,7 +74,7 @@ Rung 2 standalone on T2/T3: H-021 PARTIAL (RS-029 + RS-030, ACCE
 (3) Placement tail: a closed-loop correction aware of previously placed blocks (T2-dev-12 s4023-type pushes), plus the regression of block error on bridged base height/roll/pitch.
 (4) W
 
-**Budget:** 2979 of 3000 episodes used, 21 left. Record: 22 evidence, 22 hypotheses, 64 experiments, 104 runs, 31 results, 18 decisions.
+**Budget:** 2979 of 50000 episodes used, 47021 left. Record: 25 evidence, 27 hypotheses, 64 experiments, 104 runs, 31 results, 18 decisions.
 
 ## Recent runs (videos inside)
 
