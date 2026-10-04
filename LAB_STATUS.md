@@ -24,6 +24,10 @@ R0/T0 1.00 [0.61, 1.00] n=6 (R-023); R0/T1 1.00 [0.76, 1.00] n=12 (R-023); R0/T2
 - **X-014** (149/306 episodes run): v4_place, seeds 0-7, on all 34 T1/T2/T3 dev scenes (272). Control is v0 at matched scenes and seeds 0-7, reused from R-005 (T1-01..06), R-007 (T2-01..06), R-012. Tests -.
 - **X-022** (0/24 episodes run): Rung-4 MPC T0 probe, run SERIALLY after X-019 finishes. Run v4_mpc (Sumo CEM placement; cost = block pose + upright + collision clearance + settle velocity + an. Tests -.
 - **X-025** (0/96 episodes run): Full pre-registered design. v3_grasp_lift (release_vertical_lift_m 0.125, 12 steps, no oracle correction, default physics) at seeds 0-7 on T0-dev-01..06 and T1-. Tests H-010.
+- **X-040** (0/40 episodes run): X-035 rerun: v2_walk (w_heading=160 frozen) vs FRESH v0, ONE run_sim_batch per method with pairs=[[scene,seed],...]: 16 distinct seeds 0-15 round-robin over T0-. Tests H-014.
+- **X-041** (0/72 episodes run): X-037 rerun: v46_vlm_measure (per-block perceived-position logging; white-mask fix generalised to white cubes on bridges) vs v0, one run_sim_batch per method wi. Tests H-013.
+- **X-042** (0/192 episodes run): X-025: v3_grasp_lift vs FRESH v3_grasp control, seeds 0-7 on T0-dev-01..06 and T1-dev-01..06 (96 pairs per arm), one run_sim_batch per method with pairs, one fr. Tests H-010.
+- **X-043** (0/48 episodes run): X-022: v4_mpc vs FRESH v0, seeds 0-3 on T0-dev-01..06 (24 pairs per arm), one run_sim_batch per method with pairs, one frozen commit shared with candidate (a), . Tests H-011.
 
 ## Hypotheses
 
@@ -43,6 +47,7 @@ R0/T0 1.00 [0.61, 1.00] n=6 (R-023); R0/T1 1.00 [0.76, 1.00] n=12 (R-023); R0/T2
 | H-012 | 2 | open | [Rung 2 | pre-registered treatment, reused historical control | follows H-009, which X-019 refuted: 20/24, NOT CLEARED] Filed BEFORE any bat |
 | H-013 | 5 | open | [Rung 5 | agent hypothesis by method_designer | SUCCESSOR to H-008 (refuted by RS-012), and SUPERSEDES H-003 | filed BEFORE any run of v46_v |
 | H-014 | 2 | open | [Rung 2 | AMENDMENT of H-012 for X-035 | label: pre-registered treatment; partly reused historical control | filed BEFORE any X-035 run.] PR |
+| H-015 | 5 | open | [Rung 5 | agent hypothesis by method_designer | DATED AMENDMENT to H-013, 2026-10-04 | filed BEFORE any rerun episode. Pre-check: query_reco |
 
 ## Latest decision (D-010, cites RS-015, RS-016)
 
@@ -55,7 +60,7 @@ STOP. The budget is exhausted: 1 of 1500 episodes left, fewer than the cheapest 
 (2) X-037 rerun: v46 with per-block perceived-y logging, and the white-mask fix generalised to white cubes on bridges. 72 eps, testing H-013.
 (3) X-025: v3_grasp_lift, 96 eps, run
 
-**Budget:** 1499 of 1500 episodes used, 1 left. Record: 9 evidence, 14 hypotheses, 39 experiments, 79 runs, 16 results, 10 decisions.
+**Budget:** 1499 of 2000 episodes used, 501 left. Record: 9 evidence, 15 hypotheses, 44 experiments, 79 runs, 16 results, 10 decisions.
 
 ## Recent runs (videos inside)
 
