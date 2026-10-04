@@ -150,6 +150,9 @@ class World:
         self.frames, self.frame_every_s, self.cam = [], frame_every_s, cam
         self._renderer = None
         self._next_frame = 0.0
+        # Optional read-only instrumentation hook. Stages may observe state
+        # after each simulation step, but must not step the world themselves.
+        self.step_observer = None
 
     # --- state -------------------------------------------------------------
     def block_pose(self, bid):
@@ -237,6 +240,8 @@ class World:
                 self.d.qpos[a + 3:a + 7] = quat_mul(tq, rq)
                 self.d.qvel[v:v + 6] = 0
             mujoco.mj_step(self.m, self.d)
+            if self.step_observer is not None:
+                self.step_observer()
             if self.frame_every_s and self.d.time >= self._next_frame:
                 self.frames.append(self.render())
                 self._next_frame += self.frame_every_s

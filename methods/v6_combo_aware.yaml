@@ -1,4 +1,4 @@
-name: v6_combo
+name: v6_combo_aware
 rung: 5
 idealizations:
   - oracle_block_pose
@@ -42,8 +42,15 @@ params:
   place_correction_dwell_s: 0.2
   place_correction_tolerance_m: 0.001
   place_correction_max_step_m: 0.04
-  # H-025 strengthens oracle_block_pose to passively watch placed blocks.
+  # H-025 strengthens oracle_block_pose to watch and recover placed blocks.
   placed_block_telemetry: true
+  placed_block_monitor: true
+  placed_block_contact_band_m: 0.02
+  placed_block_descent_slow_factor: 4.0
+  placed_block_alignment_limit_m: 0.01
+  placed_block_displacement_threshold_m: 0.01
+  placed_block_max_recoveries_per_block: 1
+  placed_block_max_episode_recoveries: 2
 telemetry:
   schema: h020_combo_v1
   scene_file_count: 7
