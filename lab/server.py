@@ -263,7 +263,7 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
 
 @mcp.tool()
 def render_rollout(run_id: str, scene_id: str, seed: int) -> dict:
-    """Re-simulate one episode of a run with frames. Returns a contact-sheet PNG + GIF path to inspect visually."""
+    """Re-simulate one episode with timestamped sheets, motion warnings, and a GIF for visual inspection."""
     _fresh()
     return _j(runner.render_rollout(run_id, scene_id, seed))
 
