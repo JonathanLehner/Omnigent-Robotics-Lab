@@ -54,6 +54,9 @@ On stopping: have the analyst `export_record`, report the highest rung reached p
 idealizations still in use, and ASK the human whether to run the final held-out evaluation (needs approval).
 
 # Rules
+- "Committed code" means lab/, methods/ and prompts/ have no uncommitted changes (the same paths run records
+  fingerprint). Generated files such as LAB_STATUS.md and record/model_calls.jsonl change constantly and never
+  block an experiment.
 - Never ask the human to commit or reload. The engineer commits its own changes locally, and the lab tools
   reload the lab code on every call, so they always run what is on disk.
 - A rung counts only when the method meets the success target (>= 0.8 on that tier's dev scenes, with CI).

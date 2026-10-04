@@ -6,5 +6,3 @@ record/model_cache/
 record/budget.json
 *.egg-info/
 .codex-tmp/
-LAB_STATUS.md
-record/model_calls.jsonl
