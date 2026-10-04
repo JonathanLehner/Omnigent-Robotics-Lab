@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
-from lab import pipeline, scenes
+from lab import pipeline, scenes, sim
 
 
 SCENE_IDS = tuple(f"T0-dev-{index:02d}" for index in range(1, 7))
@@ -29,10 +29,18 @@ EXPECTED_TERMS = {
     "gripper_object",
     "gripper_height",
 }
-BOTTOM_FACE_SIZE_M = {
-    "cube": np.array([0.12, 0.12]),
-    "brick": np.array([0.12, 0.24]),
-}
+class G2GeometryError(ValueError):
+    """Raised when the rest-height precondition makes G2a unscorable."""
+
+    def __init__(self, *, z_rest: float, goal_z: float):
+        self.details = {
+            "reason": "z_rest_goal_z_mismatch",
+            "z_rest_m": z_rest,
+            "goal_z_m": goal_z,
+            "absolute_difference_m": abs(z_rest - goal_z),
+            "tolerance_m": 0.001,
+        }
+        super().__init__(json.dumps(self.details, sort_keys=True))
 
 
 def _stage(episode: dict) -> dict:
@@ -44,13 +52,12 @@ def _stage(episode: dict) -> dict:
 
 
 def _g2_checks(
-    scene: dict, physics: list[dict], target_xy: np.ndarray
+    scene: dict,
+    physics: list[dict],
+    target_xy: np.ndarray,
+    goal_z: float,
 ) -> dict[str, dict]:
-    """Evaluate the binding 2026-10-04 H-018 G2 definition."""
-    start_z = (
-        float(physics[0]["block_pose"][2]) if physics else float("nan")
-    )
-    lift_threshold = start_z + 0.05
+    """Evaluate the binding second 2026-10-04 H-018 G2 definition."""
     release_index = next(
         (
             index
@@ -61,38 +68,63 @@ def _g2_checks(
         ),
         None,
     )
-    lift_index = next(
-        (
-            index
-            for index, row in enumerate(physics)
-            if row["block_pose"][2] >= lift_threshold
-            and (release_index is None or index < release_index)
-        ),
-        None,
-    )
     target_xy = np.asarray(target_xy, dtype=float)
     carried_type = scene["target"]["blocks"][0]["type"]
     target_type = scene["target"]["blocks"][0]["type"]
+    carried_size = np.asarray(sim.BLOCK_TYPES[carried_type], dtype=float)
+    target_size = np.asarray(sim.BLOCK_TYPES[target_type], dtype=float)
     carried_radius = float(
-        np.linalg.norm(BOTTOM_FACE_SIZE_M[carried_type]) / 2.0
+        np.linalg.norm(carried_size[:2]) / 2.0
     )
     target_radius = float(
-        np.linalg.norm(BOTTOM_FACE_SIZE_M[target_type]) / 2.0
+        np.linalg.norm(target_size[:2]) / 2.0
     )
     overlap_radius = carried_radius + target_radius
+    z_rest = float(carried_size[2] / 2.0)
+    goal_z = float(goal_z)
+    if abs(z_rest - goal_z) > 0.001:
+        raise G2GeometryError(z_rest=z_rest, goal_z=goal_z)
+
+    target_distances = [
+        float(
+            np.linalg.norm(
+                np.asarray(row["block_pose"][:2], dtype=float) - target_xy
+            )
+        )
+        for row in physics
+    ]
+    enter_index = next(
+        (
+            index
+            for index, distance in enumerate(target_distances)
+            if distance <= overlap_radius
+        ),
+        release_index,
+    )
+    transit_end_index = (
+        min(enter_index, release_index)
+        if enter_index is not None and release_index is not None
+        else None
+    )
+    transit_rows = (
+        physics[:transit_end_index]
+        if transit_end_index is not None
+        else []
+    )
+    clearance_threshold = z_rest + 0.05
+    clearance_failures = [
+        (index, row)
+        for index, row in enumerate(transit_rows)
+        if row["block_pose"][2] < clearance_threshold
+    ]
 
     contact_rows: list[tuple[int, dict, float]] = []
-    if lift_index is not None and release_index is not None:
-        for index in range(lift_index, release_index):
+    if release_index is not None:
+        for index in range(release_index):
             row = physics[index]
             if row["block_floor_contacts"] <= 0:
                 continue
-            distance = float(
-                np.linalg.norm(
-                    np.asarray(row["block_pose"][:2], dtype=float)
-                    - target_xy
-                )
-            )
+            distance = target_distances[index]
             contact_rows.append((index, row, distance))
     outside_rows = [
         (index, row, distance)
@@ -131,13 +163,9 @@ def _g2_checks(
             )
         )
 
-    g2a_pass = (
-        lift_index is not None
-        and release_index is not None
-        and lift_index < release_index
-    )
-    g2b_pass = g2a_pass and not outside_rows
-    g2c_pass = g2a_pass and floor_path_m <= 0.01
+    g2a_pass = release_index is not None and not clearance_failures
+    g2b_pass = release_index is not None and not outside_rows
+    g2c_pass = release_index is not None and floor_path_m <= 0.01
     label = (
         "clean carry"
         if first_contact_index is None
@@ -148,10 +176,13 @@ def _g2_checks(
     return {
         "G2a": {
             "pass": g2a_pass,
-            "lift_threshold_m": lift_threshold,
-            "lift_time_s": (
-                physics[lift_index]["time_s"]
-                if lift_index is not None
+            "z_rest_m": z_rest,
+            "goal_z_m": goal_z,
+            "z_rest_goal_z_difference_m": abs(z_rest - goal_z),
+            "clearance_threshold_m": clearance_threshold,
+            "target_enter_time_s": (
+                physics[enter_index]["time_s"]
+                if enter_index is not None
                 else None
             ),
             "release_time_s": (
@@ -159,26 +190,19 @@ def _g2_checks(
                 if release_index is not None
                 else None
             ),
-            "max_pre_release_z_m": max(
-                (
-                    row["block_pose"][2]
-                    for row in (
-                        physics[:release_index]
-                        if release_index is not None
-                        else physics
-                    )
-                ),
+            "transit_physics_steps": len(transit_rows),
+            "minimum_transit_z_m": min(
+                (row["block_pose"][2] for row in transit_rows),
                 default=None,
             ),
+            "clearance_failure_steps": len(clearance_failures),
         },
         "G2b": {
             "pass": g2b_pass,
             "carried_radius_m": carried_radius,
             "target_radius_m": target_radius,
             "allowed_centre_distance_m": overlap_radius,
-            "pre_release_floor_contact_steps_after_lift": len(
-                contact_rows
-            ),
+            "pre_release_floor_contact_steps": len(contact_rows),
             "max_contact_centre_distance_m": max(
                 (distance for _, _, distance in contact_rows),
                 default=None,
@@ -213,7 +237,10 @@ def check_episode(
         and row["time_s"] < release_time - 1e-12
     ]
     g2_checks = _g2_checks(
-        scene, physics, stage["scene_object_goal_pose"][:2]
+        scene,
+        physics,
+        stage["scene_object_goal_pose"][:2],
+        stage["scene_object_goal_pose"][2],
     )
     iterations_ok = [
         row["samples"] == 128 and row["iterations_run"] == 4
@@ -422,9 +449,29 @@ def main() -> None:
         episode_path.write_text(
             json.dumps(episode, indent=2, sort_keys=True)
         )
-        checks = check_episode(
-            scene, episode, base_method["idealizations"]
-        )
+        try:
+            checks = check_episode(
+                scene, episode, base_method["idealizations"]
+            )
+        except G2GeometryError as error:
+            all_pass = False
+            row = {
+                "scene": scene_id,
+                "seed": args.seed,
+                "pass": False,
+                "checks": {},
+                "g2_scored": False,
+                "g2_stop": error.details,
+                "episode_json": str(episode_path),
+            }
+            summary.append(row)
+            print(json.dumps(row, sort_keys=True), flush=True)
+            print(
+                f"H018_GATE_STOP scene={scene_id} "
+                "reason=z_rest_goal_z_mismatch",
+                flush=True,
+            )
+            break
         if index >= args.render_count:
             checks["G9"] = {
                 "pass": True,
