@@ -29,6 +29,10 @@ EXPECTED_TERMS = {
     "gripper_object",
     "gripper_height",
 }
+BOTTOM_FACE_SIZE_M = {
+    "cube": np.array([0.12, 0.12]),
+    "brick": np.array([0.12, 0.24]),
+}
 
 
 def _stage(episode: dict) -> dict:
@@ -37,6 +41,163 @@ def _stage(episode: dict) -> dict:
         for row in episode["stages"]
         if row["phase"] == "mpc_weld_carry_place"
     )
+
+
+def _g2_checks(
+    scene: dict, physics: list[dict], target_xy: np.ndarray
+) -> dict[str, dict]:
+    """Evaluate the binding 2026-10-04 H-018 G2 definition."""
+    start_z = (
+        float(physics[0]["block_pose"][2]) if physics else float("nan")
+    )
+    lift_threshold = start_z + 0.05
+    release_index = next(
+        (
+            index
+            for index, row in enumerate(physics)
+            if index > 0
+            and physics[index - 1]["weld_active"]
+            and not row["weld_active"]
+        ),
+        None,
+    )
+    lift_index = next(
+        (
+            index
+            for index, row in enumerate(physics)
+            if row["block_pose"][2] >= lift_threshold
+            and (release_index is None or index < release_index)
+        ),
+        None,
+    )
+    target_xy = np.asarray(target_xy, dtype=float)
+    carried_type = scene["target"]["blocks"][0]["type"]
+    target_type = scene["target"]["blocks"][0]["type"]
+    carried_radius = float(
+        np.linalg.norm(BOTTOM_FACE_SIZE_M[carried_type]) / 2.0
+    )
+    target_radius = float(
+        np.linalg.norm(BOTTOM_FACE_SIZE_M[target_type]) / 2.0
+    )
+    overlap_radius = carried_radius + target_radius
+
+    contact_rows: list[tuple[int, dict, float]] = []
+    if lift_index is not None and release_index is not None:
+        for index in range(lift_index, release_index):
+            row = physics[index]
+            if row["block_floor_contacts"] <= 0:
+                continue
+            distance = float(
+                np.linalg.norm(
+                    np.asarray(row["block_pose"][:2], dtype=float)
+                    - target_xy
+                )
+            )
+            contact_rows.append((index, row, distance))
+    outside_rows = [
+        (index, row, distance)
+        for index, row, distance in contact_rows
+        if distance > overlap_radius
+    ]
+
+    floor_path_m = 0.0
+    floor_net_m = 0.0
+    first_contact_index = contact_rows[0][0] if contact_rows else None
+    if first_contact_index is not None and release_index is not None:
+        for index in range(first_contact_index, release_index):
+            current = physics[index]
+            following = physics[index + 1]
+            if (
+                current["block_floor_contacts"] > 0
+                and following["block_floor_contacts"] > 0
+            ):
+                floor_path_m += float(
+                    np.linalg.norm(
+                        np.asarray(following["block_pose"][:2], dtype=float)
+                        - np.asarray(
+                            current["block_pose"][:2], dtype=float
+                        )
+                    )
+                )
+        floor_net_m = float(
+            np.linalg.norm(
+                np.asarray(
+                    physics[release_index]["block_pose"][:2], dtype=float
+                )
+                - np.asarray(
+                    physics[first_contact_index]["block_pose"][:2],
+                    dtype=float,
+                )
+            )
+        )
+
+    g2a_pass = (
+        lift_index is not None
+        and release_index is not None
+        and lift_index < release_index
+    )
+    g2b_pass = g2a_pass and not outside_rows
+    g2c_pass = g2a_pass and floor_path_m <= 0.01
+    label = (
+        "clean carry"
+        if first_contact_index is None
+        else "set-down"
+        if g2b_pass and g2c_pass
+        else "drag"
+    )
+    return {
+        "G2a": {
+            "pass": g2a_pass,
+            "lift_threshold_m": lift_threshold,
+            "lift_time_s": (
+                physics[lift_index]["time_s"]
+                if lift_index is not None
+                else None
+            ),
+            "release_time_s": (
+                physics[release_index]["time_s"]
+                if release_index is not None
+                else None
+            ),
+            "max_pre_release_z_m": max(
+                (
+                    row["block_pose"][2]
+                    for row in (
+                        physics[:release_index]
+                        if release_index is not None
+                        else physics
+                    )
+                ),
+                default=None,
+            ),
+        },
+        "G2b": {
+            "pass": g2b_pass,
+            "carried_radius_m": carried_radius,
+            "target_radius_m": target_radius,
+            "allowed_centre_distance_m": overlap_radius,
+            "pre_release_floor_contact_steps_after_lift": len(
+                contact_rows
+            ),
+            "max_contact_centre_distance_m": max(
+                (distance for _, _, distance in contact_rows),
+                default=None,
+            ),
+            "outside_overlap_steps": len(outside_rows),
+        },
+        "G2c": {
+            "pass": g2c_pass,
+            "D_floor_m": floor_path_m,
+            "threshold_m": 0.01,
+            "net_displacement_m": floor_net_m,
+            "first_contact_time_s": (
+                physics[first_contact_index]["time_s"]
+                if first_contact_index is not None
+                else None
+            ),
+            "label": label,
+        },
+    }
 
 
 def check_episode(
@@ -51,33 +212,8 @@ def check_episode(
         if release_time is not None
         and row["time_s"] < release_time - 1e-12
     ]
-    start_z = float(scene["start"][0]["pos"][2])
-    lift_threshold = start_z + 0.05
-    lifted_rows = [
-        row for row in before_release if row["block_pose"][2] >= lift_threshold
-    ]
-    first_lift_time = (
-        lifted_rows[0]["time_s"] if lifted_rows else float("inf")
-    )
-    target_xy = np.asarray(stage["scene_object_goal_pose"][:2])
-    block_type = scene["target"]["blocks"][0]["type"]
-    full_xy = {
-        "cube": np.array([0.12, 0.12]),
-        "brick": np.array([0.12, 0.24]),
-    }[block_type]
-    # "Except at the target" means the carried proxy overlaps its target
-    # footprint. Two identical footprints can overlap while their centres are
-    # up to the sum of their circumscribed radii apart. This conservative,
-    # orientation-independent geometry check does not relax release criteria.
-    target_overlap_radius = float(np.linalg.norm(full_xy))
-    floor_away_from_target = sum(
-        row["block_floor_contacts"]
-        for row in before_release
-        if row["time_s"] >= first_lift_time
-        and np.linalg.norm(
-            np.asarray(row["block_pose"][:2]) - target_xy
-        )
-        > target_overlap_radius
+    g2_checks = _g2_checks(
+        scene, physics, stage["scene_object_goal_pose"][:2]
     )
     iterations_ok = [
         row["samples"] == 128 and row["iterations_run"] == 4
@@ -117,6 +253,16 @@ def check_episode(
         )
         for row in step_rows
     )
+    physics_logging_ok = bool(physics) and all(
+        {
+            "time_s",
+            "block_pose",
+            "block_floor_contacts",
+            "weld_active",
+        }
+        <= set(row)
+        for row in physics
+    )
     video = stage.get("video", {})
     rendered = bool(
         video.get("contact_sheet")
@@ -155,18 +301,7 @@ def check_episode(
                 default=None,
             ),
         },
-        "G2": {
-            "pass": bool(lifted_rows and floor_away_from_target == 0),
-            "max_pre_release_z_m": max(
-                (row["block_pose"][2] for row in before_release),
-                default=None,
-            ),
-            "lift_threshold_m": lift_threshold,
-            "floor_contacts_away_from_target_after_lift": (
-                floor_away_from_target
-            ),
-            "target_overlap_radius_m": target_overlap_radius,
-        },
+        **g2_checks,
         "G3": {
             "pass": bool(
                 stage["collision_manifest"][
@@ -230,9 +365,11 @@ def check_episode(
             "planning_steps": len(iterations_ok),
         },
         "G7": {
-            "pass": logging_ok,
+            "pass": logging_ok and physics_logging_ok,
             "jsonl": str(step_log_path),
             "rows": len(step_rows),
+            "physics_rows": len(physics),
+            "physics_resolution_block_contact_log": physics_logging_ok,
         },
         "G8": {
             "pass": bool(
@@ -307,6 +444,15 @@ def main() -> None:
         }
         summary.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
+        if not all(
+            checks[name]["pass"] for name in ("G2a", "G2b", "G2c")
+        ):
+            print(
+                f"H018_GATE_STOP scene={scene_id} "
+                "reason=binding_G2_failure",
+                flush=True,
+            )
+            break
     summary_path = output_dir / "gate_summary.json"
     summary_path.write_text(
         json.dumps(
