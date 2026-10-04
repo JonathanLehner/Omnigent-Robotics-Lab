@@ -1,0 +1,42 @@
+# H-016 candidate B: retain the frozen approach, then optimize a 2 s settle.
+name: v2_walk_settle
+rung: 2
+idealizations:
+  - oracle_structure_spec
+  - oracle_build_order
+  - weld_grasp
+  - scripted_arm
+  - no_arm_block_collision
+  - sumo_to_assembly_state_bridge
+arm_block_collision: false
+stages:
+  perceive: oracle
+  plan_order: oracle
+  build: sumo_walk_then_scripted_weld
+sumo:
+  task: spot_walk_approach_xy
+  task_module: lab/sumo_tasks/spot_walk_approach_xy.py
+  policy: Relic
+  optimizer: cem
+  num_rollouts: 24
+  episode_length_s: 4.0
+  timeout_s: 600
+  approach_tolerance_m: 0.25
+  walk_starts: varied_v1
+  task_config:
+    w_position: 160.0
+    w_heading: 160.0
+    w_controls: 0.2
+  settle_phase:
+    duration_s: 2.0
+    task_config:
+      w_position: 20000.0
+      squared_xy: true
+      w_heading: 160.0
+      w_base_speed: 50.0
+      base_speed_cap: 0.2
+      base_speed_radius: 0.0
+params:
+  segment_s: 1.0
+  place_clearance_m: 0.005
+  carry_height_m: 0.15

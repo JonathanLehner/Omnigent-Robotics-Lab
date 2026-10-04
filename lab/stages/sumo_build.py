@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
+import yaml
 
 from lab import sim
 from lab.pipeline import build_scripted_weld, stage
@@ -14,6 +15,31 @@ from lab.pipeline import build_scripted_weld, stage
 ROOT = Path(__file__).resolve().parents[2]
 SUMO = Path.home() / "src" / "sumo"
 PIXI = Path.home() / ".pixi" / "bin" / "pixi"
+
+
+def _walk_start_config(scfg: dict, episode_seed: int) -> tuple[dict, dict | None]:
+    """Resolve a versioned per-seed walk start into task config fields."""
+    table_name = scfg.get("walk_starts")
+    if not table_name:
+        return {}, None
+    table_path = ROOT / "walk_starts" / f"{table_name}.yaml"
+    table = yaml.safe_load(table_path.read_text())
+    row = table.get("starts", {}).get(str(episode_seed))
+    if row is None:
+        return {}, None
+    yaw_deg = float(row["yaw_deg"])
+    return (
+        {
+            "start_x": float(row["x"]),
+            "start_y": float(row["y"]),
+            "start_yaw": float(np.radians(yaw_deg)),
+        },
+        {
+            "table": table_name,
+            "seed": episode_seed,
+            **row,
+        },
+    )
 
 
 def _run_sumo(
@@ -26,6 +52,9 @@ def _run_sumo(
 ) -> dict:
     """Run one configured Sumo episode and return the adapter's JSON result."""
     scfg = cfg["sumo"]
+    task_config = dict(scfg.get("task_config", {}))
+    start_config, walk_start = _walk_start_config(scfg, episode_seed)
+    task_config.update(start_config)
     cmd = [
         str(PIXI),
         "run",
@@ -48,6 +77,25 @@ def _run_sumo(
         "--num-rollouts",
         str(scfg.get("num_rollouts", 24)),
     ]
+    if task_config:
+        cmd.extend(
+            [
+                "--task-config-json",
+                json.dumps(task_config, separators=(",", ":")),
+            ]
+        )
+    settle_phase = scfg.get("settle_phase")
+    if settle_phase:
+        cmd.extend(
+            [
+                "--settle-phase-s",
+                str(settle_phase["duration_s"]),
+                "--settle-config-json",
+                json.dumps(
+                    settle_phase["task_config"], separators=(",", ":")
+                ),
+            ]
+        )
     if "horizon_s" in scfg:
         cmd.extend(["--horizon", str(scfg["horizon_s"])])
     if object_start_pose is not None:
@@ -79,7 +127,9 @@ def _run_sumo(
     if res.returncode or not rows:
         detail = (res.stderr or res.stdout)[-1200:].replace("\n", " ")
         raise RuntimeError(f"sumo_task_failed:{detail}")
-    return json.loads(rows[-1])
+    result = json.loads(rows[-1])
+    result["walk_start"] = walk_start
+    return result
 
 
 def _episode(result: dict) -> dict:
@@ -95,6 +145,10 @@ def _episode(result: dict) -> dict:
         "rollout_backend": result["backend"],
         "num_rollouts": result["num_rollouts"],
         "controller_horizon_s": result.get("controller_horizon_s"),
+        "task_config": result.get("task_config"),
+        "settle_phase_s": result.get("settle_phase_s", 0.0),
+        "settle_config": result.get("settle_config"),
+        "walk_start": result.get("walk_start"),
         "object_proxy": result.get("object_proxy"),
         "object_start_pose": result.get("object_start_pose"),
         "robot_start_pose": result.get("robot_start_pose"),

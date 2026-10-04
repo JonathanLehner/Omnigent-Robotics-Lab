@@ -19,6 +19,8 @@ class SpotWalkApproachConfig(SpotBaseConfig):
     # The build site is the origin in this task frame.  Reset 1.5 m away and
     # approach a 0.15 m standoff, leaving a 1.35 m commanded walk.
     start_x: float = -1.5
+    start_y: float = 0.0
+    start_yaw: float = 0.0
     goal_x: float = -0.15
     goal_y: float = 0.0
     goal_tolerance: float = 0.25
@@ -44,15 +46,16 @@ class SpotWalkApproach(SpotBase[SpotWalkApproachConfig]):
 
     @property
     def reset_pose(self) -> np.ndarray:
+        half_yaw = self.config.start_yaw / 2.0
         return np.array(
             [
                 self.config.start_x,
-                0.0,
+                self.config.start_y,
                 STANDING_HEIGHT,
-                1.0,
+                np.cos(half_yaw),
                 0.0,
                 0.0,
-                0.0,
+                np.sin(half_yaw),
                 *LEGS_STANDING_POS_RL,
                 *self.reset_arm_pos,
             ]

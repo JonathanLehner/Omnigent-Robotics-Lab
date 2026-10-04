@@ -13,15 +13,34 @@ import importlib.util
 import json
 import shutil
 import subprocess
+import sys
 import time
 from math import atan2
 from pathlib import Path
 
 import numpy as np
 
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-def base_arrival_state(task, qpos: np.ndarray) -> dict:
-    """Return the true terminal base pose, its nominal goal, and approach errors."""
+
+def _yaw_deg(quat: np.ndarray) -> float:
+    """Return planar yaw in degrees from a wxyz quaternion."""
+    quat = np.asarray(quat, dtype=float)
+    quat /= np.linalg.norm(quat)
+    return float(
+        np.degrees(
+            atan2(
+                2.0 * (quat[0] * quat[3] + quat[1] * quat[2]),
+                1.0 - 2.0 * (quat[2] ** 2 + quat[3] ** 2),
+            )
+        )
+    )
+
+
+def base_arrival_state(task, qpos: np.ndarray, qvel: np.ndarray) -> dict:
+    """Return the true terminal base pose, velocity, and approach errors."""
     config = getattr(task, "config", None)
     if not (
         hasattr(task, "body_pose_idx")
@@ -35,14 +54,20 @@ def base_arrival_state(task, qpos: np.ndarray) -> dict:
     terminal_pose = qpos[pose_idx : pose_idx + 7]
     goal_pose = reset[pose_idx : pose_idx + 7].copy()
     goal_pose[:2] = [config.goal_x, config.goal_y]
+    goal_pose[3:7] = [1.0, 0.0, 0.0, 0.0]
     goal_xy = np.array([config.goal_x, config.goal_y])
     position_error = float(np.linalg.norm(qpos[pose_idx : pose_idx + 2] - goal_xy))
     quat = qpos[pose_idx + 3 : pose_idx + 7]
+    vel_idx = int(task.model.jnt_dofadr[task.model.joint("base").id])
+    base_speed = float(np.linalg.norm(qvel[vel_idx : vel_idx + 2]))
     # Spot's approach target has zero roll, pitch, and yaw. Report the full
     # quaternion angular distance, not only heading, so tilted arrivals show.
     orientation_error = 2.0 * np.arccos(np.clip(abs(quat[0]), 0.0, 1.0))
     return {
         "terminal_base_pose": terminal_pose.tolist(),
+        "terminal_base_xy": terminal_pose[:2].tolist(),
+        "terminal_base_yaw_deg": round(_yaw_deg(quat), 3),
+        "terminal_base_speed_m_s": round(base_speed, 4),
         "nominal_base_goal_pose": goal_pose.tolist(),
         "base_position_error_m": round(position_error, 4),
         "base_orientation_error_deg": round(float(np.degrees(orientation_error)), 2),
@@ -117,6 +142,9 @@ def main():
     ap.add_argument("--episode-length-s", type=float, default=10.0)
     ap.add_argument("--num-rollouts", type=int)
     ap.add_argument("--horizon", type=float)
+    ap.add_argument("--task-config-json")
+    ap.add_argument("--settle-phase-s", type=float, default=0.0)
+    ap.add_argument("--settle-config-json")
     ap.add_argument("--object-start-pose", type=float, nargs=7)
     ap.add_argument("--object-goal-pose", type=float, nargs=7)
     ap.add_argument("--object-size", type=float, nargs=3)
@@ -146,6 +174,21 @@ def main():
     reg = get_registered_tasks()[a.task]
     sim = _create_sim(a.task)
     task = sim.task
+    approach_config = (
+        json.loads(a.task_config_json) if a.task_config_json else {}
+    )
+    settle_config = (
+        json.loads(a.settle_config_json) if a.settle_config_json else {}
+    )
+
+    def apply_task_config(values: dict) -> None:
+        unknown = sorted(set(values) - set(vars(task.config)))
+        if unknown:
+            raise ValueError(f"unknown task config fields: {unknown}")
+        for key, value in values.items():
+            setattr(task.config, key, value)
+
+    apply_task_config(approach_config)
     if a.object_size is not None:
         size = np.asarray(a.object_size, dtype=float)
         if hasattr(task, "configure_object_proxy") and a.object_mass is not None:
@@ -243,10 +286,35 @@ def main():
         ccfg.horizon = a.horizon
     ctrl = Controller(ccfg, task, opt_cls(ocfg, task.nu), rollout_backend=reg.rollout_backend,
                       rollout_backend_registry={"mujoco_g1": G1RolloutBackend})
-    cfg = RunMPCConfig(init_task=a.task, visualize=False, num_episodes=a.episodes,
-                       episode_length_s=a.episode_length_s, save_results=False)
+    approach_state = dict(vars(task.config))
+    cfg = RunMPCConfig(
+        init_task=a.task,
+        visualize=False,
+        num_episodes=a.episodes,
+        episode_length_s=a.episode_length_s + a.settle_phase_s,
+        save_results=False,
+    )
     out = []
     for i in range(a.episodes):
+        apply_task_config(approach_state)
+        phase_state = {"settle": False}
+        post_sim_step = task.post_sim_step
+
+        def post_sim_step_with_phase_switch():
+            post_sim_step()
+            if (
+                a.settle_phase_s > 0.0
+                and not phase_state["settle"]
+                and task.data.time >= a.episode_length_s
+            ):
+                apply_task_config(settle_config)
+                phase_state["settle"] = True
+
+        task.post_sim_step = post_sim_step_with_phase_switch
+        reset = np.asarray(task.reset_pose)
+        actual_start_pose = reset[
+            task.body_pose_idx : task.body_pose_idx + 7
+        ].tolist()
         episode_seed = a.episode_seed + i
         t = time.time()
         planning_wall_s = 0.0
@@ -267,7 +335,9 @@ def main():
             )
         finally:
             ctrl.update_action = update_action
-        final_qpos = np.asarray(ep["qpos_traj"][-1]) if len(ep["qpos_traj"]) else None
+            task.post_sim_step = post_sim_step
+        final_qpos = np.asarray(task.data.qpos).copy()
+        final_qvel = np.asarray(task.data.qvel).copy()
         sim_dt = task.sim_model.opt.timestep
         plan_dt = 1.0 / ctrl.controller_cfg.control_freq
         num_steps = int(cfg.episode_length_s / sim_dt) + 1
@@ -280,14 +350,16 @@ def main():
                "success": bool(ep["success"]), "failure": bool(ep["failure"]),
                "length_s": float(ep["length"]),
                "mean_reward": float(np.mean(ep["rewards"])) if len(ep["rewards"]) else None,
-               "final_qpos": final_qpos.tolist() if final_qpos is not None else None,
+               "final_qpos": final_qpos.tolist(),
+               "actual_start_pose": actual_start_pose,
+               "settle_phase_s": a.settle_phase_s,
+               "settle_phase_applied": phase_state["settle"],
                "mpc_planning_steps": planning_steps,
                "max_opt_iters_per_step": ctrl.controller_cfg.max_opt_iters,
                "mpc_iterations_completed": planning_steps * ctrl.controller_cfg.max_opt_iters,
                "planning_wall_s": round(planning_wall_s, 3),
                "wall_s": round(time.time() - t, 1)}
-        if final_qpos is not None:
-            row.update(base_arrival_state(task, final_qpos))
+        row.update(base_arrival_state(task, final_qpos, final_qvel))
         if a.video_dir and len(ep["qpos_traj"]):
             row["video"] = save_video(
                 task,
@@ -322,6 +394,9 @@ def main():
                       "rollout_cutoff_mode": "full_fixed_step_horizon",
                       "eigen_threads": 1, "onnx_inter_op_threads": 1,
                       "optimizer": a.optimizer, "num_rollouts": ocfg.num_rollouts,
+                      "task_config": approach_config,
+                      "settle_phase_s": a.settle_phase_s,
+                      "settle_config": settle_config,
                       "controller_horizon_s": ctrl.controller_cfg.horizon,
                       "backend": type(ctrl.rollout_backend).__name__,
                       "object_proxy": object_proxy,
