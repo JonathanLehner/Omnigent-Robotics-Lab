@@ -1,0 +1,34 @@
+# H-024 rung 3: maximum physical pinch, gravity-compensated hand hold
+# throughout a gradual open, then a Cartesian-corrected world-z lift.
+name: v3_grasp_hold
+rung: 3
+idealizations:
+  - oracle_structure_spec
+  - oracle_build_order
+  - oracle_block_pose
+  - fixed_base
+  - scripted_arm
+arm_block_collision: true
+stages:
+  perceive: oracle
+  plan_order: oracle
+  build: scripted_real_grasp_hold
+params:
+  segment_s: 2.5
+  place_clearance_m: 0.008
+  carry_height_m: 0.15
+  grasp_tip_offset_m: [0.015, 0.005, 0.01]
+  handle_friction: [1.0, 0.01, 0.001]
+  # Flagged H-024 change 2: resolve dynamically to ctrlrange[1].
+  grasp_close_command: max
+  grasp_close_dwell_s: 1.0
+  grasp_open_command: -1.0
+  release_open_s: 1.5
+  release_dwell_s: 0.5
+  release_vertical_lift_m: 0.15
+  release_lift_s: 1.75
+  release_xy_hold_gain: 3.0
+  min_transport_m: 0.08
+  max_relative_slip_m: 0.04
+  max_pre_release_error_m: 0.05
+  handle_collision_displacement_m: 0.02
