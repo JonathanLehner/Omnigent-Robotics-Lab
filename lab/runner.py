@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import copy
+import re
 import subprocess
 import time
 import traceback
@@ -27,7 +28,6 @@ FROZEN = ROOT / "record" / "frozen_eval.sha256"
 BUDGET = record.DB_PATH.parent / "budget.json"  # per record, so the single-agent baseline has its own
 MAX_WORKERS = max(1, min(8, (os.cpu_count() or 2) - 2))
 SUMO_ENV = Path.home() / "src" / "sumo" / ".pixi" / "envs" / "default"
-METHOD_ARM_CAPS = {"v47_vlm_anchor": 40, "v0": 16}
 
 
 def eval_hash() -> str:
@@ -185,20 +185,64 @@ def _check_scene_hash_coverage(scene: dict, expected_count: int) -> None:
         )
 
 
-def _method_arm_cap(
-    experiment_id: str, method: str, planned_episodes: int | None = None
-) -> int | None:
-    if experiment_id == "X-049" and method in {
-        "v6_combo",
-        "v6_combo_t0",
-        "v0",
-    }:
-        # X-049 is 192 episodes under Branch A and 96 under Branch B. Keep the
-        # arms matched even if the record still carries the pre-branch total.
-        half = (planned_episodes or 192) // 2
-        ceiling = 48 if method == "v6_combo_t0" else 96
-        return min(ceiling, half)
-    return METHOD_ARM_CAPS.get(method)
+_METHOD_NAME = re.compile(r"\bv\d+[a-z0-9_]*\b", re.IGNORECASE)
+
+
+def _experiment_arm_caps(experiment: dict) -> dict[str, int]:
+    """Derive per-method episode caps from an experiment record."""
+    data = experiment.get("data", experiment)
+    description = str(data.get("design") or data.get("method") or "")
+    parts = re.split(r"\bvs\.?\b", description, flags=re.IGNORECASE)
+    if len(parts) > 1:
+        methods = [matches[0] for part in parts if (matches := _METHOD_NAME.findall(part))]
+    else:
+        methods = list(dict.fromkeys(_METHOD_NAME.findall(description)))
+
+    caps: dict[str, int] = {}
+    for field in ("design", "arms", "arm"):
+        value = data.get(field)
+        rows = value if isinstance(value, list) else [value]
+        for row in rows:
+            if isinstance(row, dict) and "method" in row:
+                episodes = row.get("episodes", row.get("planned_episodes"))
+                if episodes is not None:
+                    caps[str(row["method"])] = int(episodes)
+            elif isinstance(row, dict):
+                for name, episodes in row.items():
+                    if isinstance(episodes, int):
+                        caps[str(name)] = episodes
+
+    for name, episodes in re.findall(
+        r"\b(v\d+[a-z0-9_]*)\b\s+(\d+)\b", description, re.IGNORECASE
+    ):
+        caps.setdefault(name, int(episodes))
+    for name, episodes in re.findall(
+        r"\b(v\d+[a-z0-9_]*)\b\s*\(\s*(\d+)\s*(?:ep|episodes)\b",
+        description,
+        re.IGNORECASE,
+    ):
+        caps.setdefault(name, int(episodes))
+    cap_text = re.search(r"\bcaps?:\s*([^.]*)", description, re.IGNORECASE)
+    if cap_text:
+        named_caps = re.findall(
+            r"\b(v\d+[a-z0-9_]*)\b\s*[:=]?\s*(\d+)",
+            cap_text.group(1),
+            re.IGNORECASE,
+        )
+        if named_caps:
+            for name, episodes in named_caps:
+                caps.setdefault(name, int(episodes))
+        else:
+            numbers = [int(n) for n in re.findall(r"\d+", cap_text.group(1))]
+            for name, episodes in zip(methods, numbers):
+                caps.setdefault(name, episodes)
+
+    even_cap = int(data["episodes"]) // len(methods) if methods else 0
+    return {name: caps.get(name, even_cap) for name in methods}
+
+
+def _method_arm_cap(experiment: dict, method: str) -> int:
+    return _experiment_arm_caps(experiment).get(method, 0)
 
 
 VIDEO_FRAME_S = 0.4  # sim seconds between video frames; played back at 4x speed
@@ -255,6 +299,7 @@ def write_run_page(
     lines = [f"# {run_id}: {method} ({experiment_id})", "",
              f"Success {summary['success_rate']:.2f} (95% CI {lo:.2f}-{hi:.2f}), n={summary['episodes']}, "
              f"median placement error {summary['median_pos_err_cm']:.1f} cm, failures {summary['failure_categories'] or 'none'}.",
+             f"Distinct perception prompt hashes: {summary['perception_prompt_sha256'] or 'none'}.",
              "", "## Run fingerprint", "", "```json", json.dumps(fingerprint, indent=2, sort_keys=True), "```", "",
              "| scene | seed | success | block errors (cm) | failures | video |", "|---|---|---|---|---|---|"]
     for e in eps:
@@ -309,12 +354,9 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
         for r in prior
         if r["data"]["method"] == method
     )
-    arm_cap = _method_arm_cap(
-        experiment_id, method, int(exp["data"]["episodes"])
-    )
+    arm_cap = _method_arm_cap(exp, method)
     if (
         not final_eval
-        and arm_cap is not None
         and method_episodes_so_far + n > arm_cap
     ):
         raise RuntimeError(
@@ -370,6 +412,11 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
     (run_dir / "episodes.jsonl").write_text("\n".join(json.dumps(e) for e in eps))
     summary = metrics.summarize(eps) | {"wall_s": round(wall, 1), "workers": workers,
                                          "episodes_per_hour": round(n / wall * 3600)}
+    summary["perception_prompt_sha256"] = sorted({
+        e.get("perceive", {}).get("prompt_sha256")
+        for e in eps
+        if e.get("perceive", {}).get("prompt_sha256")
+    })
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=1))
     (run_dir / "method.yaml").write_text((ROOT / "methods" / f"{method}.yaml").read_text())
     run_id = record.add("run", author, {

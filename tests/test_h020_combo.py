@@ -59,7 +59,7 @@ def test_per_block_pose_errors_and_true_support_logging():
     pairs = {"b0": "b0", "b1": "b1"}
 
     h020_telemetry.attach_perception_errors(info, spec, _scene(), pairs)
-    log = {}
+    log = {"perceive": info}
     h020_telemetry.attach_order(log, ["b0", "b1"], spec, _scene(), pairs)
 
     assert info["block_pose_errors"][1]["e"] == {
@@ -72,19 +72,42 @@ def test_per_block_pose_errors_and_true_support_logging():
     h020_telemetry.attach_order(log, ["b1", "b0"], spec, _scene(), pairs)
     assert log["plan_order"]["support_valid_true"] is False
 
+    mismatched = deepcopy(spec)
+    mismatched[1]["layer"] = 0
+    info = {}
+    h020_telemetry.attach_perception_errors(
+        info, mismatched, _scene(), pairs
+    )
+    assert info["structure_matches_true"] is False
+    log = {"perceive": info}
+    h020_telemetry.attach_order(
+        log, ["b0", "b1"], mismatched, _scene(), pairs
+    )
+    assert log["plan_order"]["support_valid_true"] == "n/a_mismatch"
+
 
 def test_failure_classifier_order_and_walk_absorption():
     base = {
         "success": False,
-        "plan_order": {"support_valid_true": False},
+        "plan_order": {
+            "support_valid_true": False,
+            "support_valid_perceived": False,
+            "planner_error": "order_infeasible: no ready block",
+        },
         "walk_end": {"xy_error_cm": 4.0, "yaw_error_deg": 0.0},
         "perceive": {
+            "structure_matches_true": False,
             "block_pose_errors": [],
             "spurious_perceived_blocks": [{"perceived_id": "p9"}],
         },
         "blocks": [],
     }
-    assert h020_telemetry.classify_failure(base) == "order"
+    assert h020_telemetry.classify_failure(base) == "perception_structure"
+
+    matched = deepcopy(base)
+    matched["perceive"]["structure_matches_true"] = True
+    matched["perceive"]["spurious_perceived_blocks"] = []
+    assert h020_telemetry.classify_failure(matched) == "order"
 
     passing = deepcopy(base)
     passing["success"] = True
@@ -115,7 +138,7 @@ def test_failure_classifier_localization_before_walk():
     assert h020_telemetry.classify_failure(log) == "perception_localization"
 
 
-def test_scene_hash_coverage_and_x049_caps():
+def test_scene_hash_coverage_and_experiment_caps():
     scene = {
         "id": "T0-dev-01",
         "split": "dev",
@@ -140,8 +163,9 @@ def test_scene_hash_coverage_and_x049_caps():
     with pytest.raises(RuntimeError, match="scene_hash_coverage"):
         runner._check_scene_hash_coverage(scene, 7)
 
-    assert runner._method_arm_cap("X-049", "v6_combo", 192) == 96
-    assert runner._method_arm_cap("X-049", "v0", 192) == 96
-    assert runner._method_arm_cap("X-049", "v6_combo_t0", 96) == 48
-    assert runner._method_arm_cap("X-049", "v0", 96) == 48
-    assert runner._method_arm_cap("X-051", "v0") == 16
+    experiment = {"data": {"method": "v6_combo vs v0", "episodes": 192}}
+    caps = runner._experiment_arm_caps(experiment)
+    assert caps == {"v6_combo": 96, "v0": 96}
+    assert all(96 <= runner._method_arm_cap(experiment, method) for method in caps)
+    assert all(96 + 1 > runner._method_arm_cap(experiment, method) for method in caps)
+    assert runner._method_arm_cap(experiment, "v47_vlm_anchor") == 0

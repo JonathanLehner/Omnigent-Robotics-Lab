@@ -125,6 +125,16 @@ def attach_perception_errors(
         for perceived_id, block in by_perceived.items()
         if perceived_id not in pairs
     ]
+    info["structure_matches_true"] = (
+        len(spec) == len(scene["target"]["blocks"])
+        and not info["spurious_perceived_blocks"]
+        and all(
+            row["e_status"] == "matched"
+            and row["true_type"] == row["perceived_type"]
+            and row["true_layer"] == row["perceived_layer"]
+            for row in rows
+        )
+    )
 
 
 def _support_valid(order: list[str], by_id: dict[str, dict]) -> bool:
@@ -146,16 +156,25 @@ def attach_order(
     spec: list[dict],
     scene: dict,
     pairs: dict[str, str],
+    planner_error: str | None = None,
 ) -> None:
     """Log perceived and true-support validity for the planned sequence."""
     perceived_by_id = {block["id"]: block for block in spec}
     true_by_id = {block["id"]: block for block in scene["target"]["blocks"]}
     true_order = [pairs[block_id] for block_id in order if block_id in pairs]
+    structure_matches_true = log.get("perceive", {}).get(
+        "structure_matches_true", False
+    )
     log["plan_order"] = {
         "planned_ids": list(order),
         "matched_true_ids": true_order,
         "support_valid_perceived": _support_valid(order, perceived_by_id),
-        "support_valid_true": _support_valid(true_order, true_by_id),
+        "support_valid_true": (
+            _support_valid(true_order, true_by_id)
+            if structure_matches_true
+            else "n/a_mismatch"
+        ),
+        "planner_error": planner_error,
     }
 
 
@@ -197,18 +216,17 @@ def classify_failure(log: dict) -> str | None:
     if log.get("success"):
         return "walk_drift_absorbed" if walk_outlier else None
 
-    plan = log.get("plan_order", {})
-    if plan.get("support_valid_true") is False:
-        return "order"
-
     perception = log.get("perceive", {})
     rows = perception.get("block_pose_errors", [])
-    if perception.get("spurious_perceived_blocks") or any(
-        row["e_status"] == "missing"
-        or row.get("true_type") != row.get("perceived_type")
-        or row.get("true_layer") != row.get("perceived_layer")
-        for row in rows
-    ):
+    structure_mismatch = perception.get("structure_matches_true") is False
+    plan = log.get("plan_order", {})
+    planner_failed_or_invalid = bool(plan.get("planner_error")) or any(
+        plan.get(key) is False
+        for key in ("support_valid_perceived", "support_valid_true")
+    )
+    if not structure_mismatch and planner_failed_or_invalid:
+        return "order"
+    if structure_mismatch:
         return "perception_structure"
 
     failed_ids = {

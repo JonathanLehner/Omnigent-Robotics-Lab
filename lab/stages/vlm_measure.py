@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import colorsys
-import uuid
 from pathlib import Path
 
 import numpy as np
@@ -141,9 +140,8 @@ def _sample_text(perceive_cfg: dict) -> str:
     mode = perceive_cfg.get("cache_mode", "fresh_per_seed")
     base = perceive_cfg.get("text", "")
     if mode == "fresh_per_seed":
-        # The stage contract does not receive the episode seed. A nonce makes every
-        # episode invocation a fresh draw, which is the sampling assumption in H-013.
-        return f"{base}\nIndependent-sample nonce: {uuid.uuid4().hex}"
+        # use_cache=False makes each invocation a fresh draw; keep prompt bytes fixed.
+        return base
     if mode == "reuse":
         return base
     raise ValueError(f"unsupported perceive.cache_mode {mode!r}")

@@ -230,14 +230,12 @@ def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None =
     blocks = [scenes.to_world(b, pos=np.asarray(start[b["id"]]["pos"]) - sim.SITE + [*rng.uniform(-0.02, 0.02, 2), 0],
                               yaw=float(rng.uniform(-3, 3)))
               for b in scene["target"]["blocks"]]
+    spec, order, planner_error = [], [], None
     try:
         spec, info = STAGES["perceive"][cfg["stages"]["perceive"]](scene, cfg)
         log["perceive"] = info | {"n_blocks": len(spec)}
-        order = STAGES["plan_order"][cfg["stages"]["plan_order"]](spec, scene, cfg)
-        log["order"] = order
     except Exception as e:  # noqa: BLE001 - a broken stage is a result, not a crash
-        log["failures"].append(str(e).split(":")[0] if "infeasible" in str(e) else f"stage_error:{type(e).__name__}")
-        spec, order = [], []
+        log["failures"].append(f"stage_error:{type(e).__name__}")
     pairs, fails = _match(spec, scene)
     log["failures"] += fails
     anchored_telemetry = (
@@ -256,7 +254,24 @@ def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None =
         h020_telemetry.attach_perception_errors(
             log["perceive"], spec, scene, pairs
         )
-        h020_telemetry.attach_order(log, order, spec, scene, pairs)
+    if "perceive" in log:
+        try:
+            order = STAGES["plan_order"][cfg["stages"]["plan_order"]](
+                spec, scene, cfg
+            )
+            log["order"] = order
+        except Exception as e:  # noqa: BLE001 - a broken stage is a result
+            planner_error = str(e)
+            log["failures"].append(
+                planner_error
+                if "infeasible" in planner_error
+                else f"stage_error:{type(e).__name__}"
+            )
+            log["order_error"] = planner_error
+    if h020_telemetry_enabled and "perceive" in log:
+        h020_telemetry.attach_order(
+            log, order, spec, scene, pairs, planner_error=planner_error
+        )
     pictures = {}
     if frame_every_s:  # videos show the target: ghost blocks at the site + the picture Spot was given
         views = scene.get("image_views", {})

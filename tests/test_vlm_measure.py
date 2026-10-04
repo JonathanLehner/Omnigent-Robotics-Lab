@@ -187,6 +187,12 @@ def test_anchor_camera_constants_match_renderer():
     assert vlm_measure_anchor.CAMERA_FOVY_DEG == model.vis.global_.fovy
 
 
+def test_fresh_draw_prompt_bytes_are_pinned():
+    cfg = {"cache_mode": "fresh_per_seed", "text": "fixed"}
+    assert vlm_measure._sample_text(cfg) == "fixed"
+    assert vlm_measure._sample_text(cfg) == "fixed"
+
+
 def test_anchor_telemetry_reports_missing_spurious_e_and_p():
     spec = [
         {
