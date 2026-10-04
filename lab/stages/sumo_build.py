@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from pathlib import Path
 
 import numpy as np
@@ -53,6 +54,9 @@ def _run_sumo(
     """Run one configured Sumo episode and return the adapter's JSON result."""
     scfg = cfg["sumo"]
     task_config = dict(scfg.get("task_config", {}))
+    for key in ("forced_release_s", "post_release_s"):
+        if key in scfg:
+            task_config.setdefault(key, scfg[key])
     start_config, walk_start = _walk_start_config(scfg, episode_seed)
     task_config.update(start_config)
     cmd = [
@@ -77,6 +81,22 @@ def _run_sumo(
         "--num-rollouts",
         str(scfg.get("num_rollouts", 24)),
     ]
+    if "max_opt_iters_per_step" in scfg:
+        cmd.extend(
+            [
+                "--max-opt-iters-per-step",
+                str(scfg["max_opt_iters_per_step"]),
+            ]
+        )
+    if scfg.get("log_per_step_cost"):
+        log_dir = ROOT / "runs" / "sumo_step_logs"
+        step_log = (
+            log_dir
+            / f"{scfg['task']}_{time.time_ns()}_s{episode_seed}.jsonl"
+        )
+        cmd.extend(["--step-log-path", str(step_log)])
+    if scfg.get("video_dir"):
+        cmd.extend(["--video-dir", str(Path(scfg["video_dir"]).resolve())])
     if task_config:
         cmd.extend(
             [
@@ -316,6 +336,207 @@ def build_sumo_mpc_weld_place(world, spec, order, pairs, cfg, log):
                     *assembly_quat.tolist(),
                 ],
                 "handoff_displacement_xyz_m": handoff_displacement.tolist(),
+                "handoff_displacement_m": float(
+                    np.linalg.norm(handoff_displacement)
+                ),
+                "handoff_displacement_deg": _quat_error_deg(
+                    assembly_quat, terminal_pose[3:7]
+                ),
+            }
+        )
+        _log_next_settle_drift(world, pid, stage_log)
+
+
+@stage("build", "sumo_mpc_weld_carry_place")
+def build_sumo_mpc_weld_carry_place(world, spec, order, pairs, cfg, log):
+    """Run H-018's verified weld-carry MPC and bridge the post-release pose."""
+    by_id = {block["id"]: block for block in spec}
+    expected_manifest = cfg["idealizations"]
+    for sid in order:
+        if sid not in pairs:
+            continue
+        block = by_id[sid]
+        pid = pairs[sid]
+        target_pos = sim.SITE + np.asarray(block["pos"], dtype=float)
+        target_yaw = np.radians(float(block.get("yaw", 0.0))) / 2.0
+        target_quat = np.array(
+            [np.cos(target_yaw), 0.0, 0.0, np.sin(target_yaw)]
+        )
+        object_goal_pose = np.concatenate([target_pos, target_quat])
+        start_pos, start_quat = world.block_pose(pid)
+        object_start_pose = np.concatenate([start_pos, start_quat])
+        result = _run_sumo(
+            cfg,
+            episode_seed=int(log["seed"]),
+            object_start_pose=object_start_pose,
+            object_goal_pose=object_goal_pose,
+            object_size=sim.BLOCK_TYPES[block["type"]],
+            object_mass=sim.BLOCK_MASS[block["type"]],
+        )
+        episode = _episode(result)
+        physics_steps = episode.get("physics_steps", [])
+        pre_release = [
+            row
+            for row in physics_steps
+            if episode.get("release_time_s") is None
+            or row["time_s"] < episode["release_time_s"] - 1e-12
+        ]
+        max_weld_position_drift = max(
+            (
+                row["weld_position_drift_m"]
+                for row in pre_release
+            ),
+            default=float("inf"),
+        )
+        max_weld_angle_drift = max(
+            (
+                row["weld_angle_drift_deg"]
+                for row in pre_release
+            ),
+            default=float("inf"),
+        )
+        total_robot_block_contacts = sum(
+            row["robot_block_contacts"] for row in physics_steps
+        )
+        max_base_xy_displacement = max(
+            (
+                row["base_xy_displacement_m"]
+                for row in physics_steps
+            ),
+            default=float("inf"),
+        )
+        max_base_yaw_change = max(
+            (row["base_yaw_change_deg"] for row in physics_steps),
+            default=float("inf"),
+        )
+        runtime_manifest = episode.get(
+            "runtime_idealization_manifest", []
+        )
+        manifest_matches = (
+            len(runtime_manifest) == len(expected_manifest)
+            and set(runtime_manifest) == set(expected_manifest)
+        )
+        weld_ok = bool(
+            physics_steps
+            and physics_steps[0]["weld_active"]
+            and all(row["weld_active"] for row in pre_release)
+            and max_weld_position_drift <= 0.001
+            and max_weld_angle_drift <= 1.0
+            and episode.get("release_transitions") == 1
+        )
+        collision_manifest = episode.get("collision_manifest", {})
+        collision_ok = bool(
+            collision_manifest.get("all_robot_block_pairs_excluded")
+            and collision_manifest.get("block_floor_collision_enabled")
+            and total_robot_block_contacts == 0
+        )
+        base_ok = bool(
+            max_base_xy_displacement <= 0.02
+            and max_base_yaw_change <= 2.0
+        )
+        tags = []
+        if episode.get("forced_release"):
+            tags.append("mpc_carry_forced_release")
+        for ok, tag in (
+            (weld_ok, "construct_weld"),
+            (collision_ok, "construct_collision"),
+            (base_ok, "construct_base"),
+            (manifest_matches, "construct_manifest"),
+        ):
+            if not ok:
+                tags.append(tag)
+                log["failures"].append(tag)
+        stage_log = {
+            "phase": "mpc_weld_carry_place",
+            "block": pid,
+            "assembly_bridge": (
+                "teleport_sumo_release_plus_1s_pose"
+            ),
+            "bridge_snaps_to_goal": False,
+            "scene_object_start_pose": object_start_pose.tolist(),
+            "scene_object_goal_pose": object_goal_pose.tolist(),
+            "runtime_idealization_manifest": runtime_manifest,
+            "expected_idealizations": expected_manifest,
+            "manifest_matches_yaml": manifest_matches,
+            "idealization_evidence": {
+                "weld_active_at_t0": bool(
+                    physics_steps
+                    and physics_steps[0]["weld_active"]
+                ),
+                "max_pre_release_weld_position_drift_m": (
+                    max_weld_position_drift
+                ),
+                "max_pre_release_weld_angle_drift_deg": (
+                    max_weld_angle_drift
+                ),
+                "collision_masks": collision_manifest,
+                "base_commands_clamped": True,
+                "max_base_xy_displacement_m": max_base_xy_displacement,
+                "max_base_yaw_change_deg": max_base_yaw_change,
+                "bridge_mode": "release_plus_post_release_s",
+                "pick_mode": "welded_at_reset",
+                "release_mode": "scripted_predicate_or_forced_time",
+            },
+            "tags": tags,
+            "construct_weld": weld_ok,
+            "construct_collision": collision_ok,
+            "construct_base": base_ok,
+            "construct_manifest": manifest_matches,
+            "handoff_displacement_xyz_m": None,
+            "handoff_displacement_m": None,
+            "handoff_displacement_deg": None,
+            "post_transfer_settle_drift_xyz_m": None,
+            "post_transfer_settle_drift_m": None,
+            "post_transfer_settle_drift_deg": None,
+            **episode,
+        }
+        log["stages"].append(stage_log)
+
+        echoed_goal = episode.get("object_goal_pose")
+        if echoed_goal is None or not np.allclose(
+            np.asarray(echoed_goal, dtype=float),
+            object_goal_pose,
+            atol=1e-9,
+            rtol=0.0,
+        ):
+            log["failures"].append("sumo_object_goal_mismatch")
+            continue
+        reported_pose_idx = episode.get("object_pose_qpos_index")
+        configured_pose_idx = int(
+            cfg["sumo"]["object_pose_qpos_index"]
+        )
+        if reported_pose_idx != configured_pose_idx:
+            log["failures"].append(
+                "sumo_object_pose_qpos_index_mismatch"
+            )
+            if "construct_manifest" not in tags:
+                tags.append("construct_manifest")
+            stage_log["construct_manifest"] = False
+            continue
+        bridge_pose = episode.get(
+            "object_pose_at_release_plus_post_release_s"
+        )
+        if bridge_pose is None:
+            log["failures"].append("mpc_carry_no_post_release_pose")
+            continue
+        terminal_pose = np.asarray(bridge_pose, dtype=float)
+        joint = world.m.joint(f"{pid}_free")
+        qadr = joint.qposadr[0]
+        dadr = joint.dofadr[0]
+        world.d.qpos[qadr : qadr + 7] = terminal_pose
+        world.d.qvel[dadr : dadr + 6] = 0.0
+        assembly_pos, assembly_quat = world.block_pose(pid)
+        handoff_displacement = assembly_pos - terminal_pose[:3]
+        stage_log.update(
+            {
+                "sumo_bridge_block_pose": terminal_pose.tolist(),
+                "assembly_block_pose_after_transfer": [
+                    *assembly_pos.tolist(),
+                    *assembly_quat.tolist(),
+                ],
+                "handoff_displacement_xyz_m": (
+                    handoff_displacement.tolist()
+                ),
                 "handoff_displacement_m": float(
                     np.linalg.norm(handoff_displacement)
                 ),

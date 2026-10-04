@@ -1,0 +1,35 @@
+# H-018: H-011's weld-carry MPC placement construct, with every
+# idealization verified at runtime before the result is eligible for analysis.
+name: v4_mpc_weld
+rung: 4
+idealizations:
+  - oracle_structure_spec
+  - oracle_build_order
+  - oracle_block_pose
+  - weld_grasp
+  - no_arm_block_collision
+  - fixed_base
+  - sumo_to_assembly_state_bridge
+  - oracle_pick
+  - scripted_release_trigger
+  - sumo_box_proxy_dynamics
+arm_block_collision: false
+stages:
+  perceive: oracle
+  plan_order: oracle
+  build: sumo_mpc_weld_carry_place
+sumo:
+  task: spot_block_mpc_weld
+  task_module: lab/sumo_tasks/spot_block_mpc_weld.py
+  policy: Relic
+  optimizer: cem
+  num_rollouts: 128
+  max_opt_iters_per_step: 4
+  horizon_s: 2.0
+  episode_length_s: 10.0
+  forced_release_s: 8.0
+  post_release_s: 1.0
+  timeout_s: 1800
+  object_pose_qpos_index: 26
+  log_per_step_cost: true
+  emit_idealization_manifest: true
