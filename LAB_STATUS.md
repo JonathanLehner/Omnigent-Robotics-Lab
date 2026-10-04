@@ -9,13 +9,13 @@
 | 2 | Walking approach | 🟢 0.80 | 🟢 1.00 | ⚪ – | ⚪ – | 🟢 Passed so far |
 | 3 | Real gripper grasp | 🟢 1.00 | 🔴 0.00 | ⚪ – | ⚪ – | 🔴 Below target: T1 |
 | 4 | Lab-chosen placement (MPC) | ⚪ – | 🔵 1.00 | 🔵 0.62 | 🔵 0.25 | 🔵 Running: T1, T2, T3 |
-| 5 | Structure from picture | 🟢 1.00 | 🔵 1.00 | 🔵 0.88 | 🔵 0.88 | 🔵 Running: T1, T2, T3 |
+| 5 | Structure from picture | 🟢 1.00 | 🔵 1.00 | 🔵 0.50 | 🔵 0.88 | 🔵 Running: T1, T2, T3 |
 
 🟢 passed (>= 0.80)  🔵 running now  🔴 below target  ⚪ not started. Success rate on dev scenes, latest run per cell.
 
 <details><summary>95% CIs and runs</summary>
 
-R0/T0 1.00 [0.61, 1.00] n=6 (R-023); R0/T1 1.00 [0.76, 1.00] n=12 (R-023); R0/T2 0.88 [0.53, 0.98] n=8 (R-035); R0/T3 1.00 [0.68, 1.00] n=8 (R-035); R1/T0 1.00 [0.93, 1.00] n=48 (R-002); R1/T1 1.00 [0.93, 1.00] n=48 (R-018); R1/T2 0.94 [0.80, 0.98] n=32 (R-018); R1/T3 0.98 [0.89, 1.00] n=48 (R-018); R2/T0 0.80 [0.58, 0.92] n=20 (R-030); R2/T1 1.00 [0.68, 1.00] n=8 (R-046); R3/T0 1.00 [0.61, 1.00] n=6 (R-025); R3/T1 0.00 [0.00, 0.24] n=12 (R-025); R4/T1 1.00 [0.86, 1.00] n=24 (R-033); R4/T2 0.62 [0.31, 0.86] n=8 (R-033); R4/T3 0.25 [0.07, 0.59] n=8 (R-033); R5/T0 1.00 [0.93, 1.00] n=48 (R-013); R5/T1 1.00 [0.86, 1.00] n=24 (R-077); R5/T2 0.88 [0.53, 0.98] n=8 (R-077); R5/T3 0.88 [0.53, 0.98] n=8 (R-077)
+R0/T0 1.00 [0.61, 1.00] n=6 (R-023); R0/T1 1.00 [0.76, 1.00] n=12 (R-023); R0/T2 0.88 [0.53, 0.98] n=8 (R-035); R0/T3 1.00 [0.68, 1.00] n=8 (R-035); R1/T0 1.00 [0.93, 1.00] n=48 (R-002); R1/T1 1.00 [0.93, 1.00] n=48 (R-018); R1/T2 0.94 [0.80, 0.98] n=32 (R-018); R1/T3 0.98 [0.89, 1.00] n=48 (R-018); R2/T0 0.80 [0.58, 0.92] n=20 (R-030); R2/T1 1.00 [0.68, 1.00] n=8 (R-046); R3/T0 1.00 [0.61, 1.00] n=6 (R-025); R3/T1 0.00 [0.00, 0.24] n=12 (R-025); R4/T1 1.00 [0.86, 1.00] n=24 (R-033); R4/T2 0.62 [0.31, 0.86] n=8 (R-033); R4/T3 0.25 [0.07, 0.59] n=8 (R-033); R5/T0 1.00 [0.93, 1.00] n=48 (R-013); R5/T1 1.00 [0.86, 1.00] n=24 (R-077); R5/T2 0.50 [0.22, 0.78] n=8 (R-078); R5/T3 0.88 [0.53, 0.98] n=8 (R-078)
 
 </details>
 
@@ -24,7 +24,7 @@ R0/T0 1.00 [0.61, 1.00] n=6 (R-023); R0/T1 1.00 [0.76, 1.00] n=12 (R-023); R0/T2
 - **X-014** (149/306 episodes run): v4_place, seeds 0-7, on all 34 T1/T2/T3 dev scenes (272). Control is v0 at matched scenes and seeds 0-7, reused from R-005 (T1-01..06), R-007 (T2-01..06), R-012. Tests -.
 - **X-022** (0/24 episodes run): Rung-4 MPC T0 probe, run SERIALLY after X-019 finishes. Run v4_mpc (Sumo CEM placement; cost = block pose + upright + collision clearance + settle velocity + an. Tests -.
 - **X-025** (0/96 episodes run): Full pre-registered design. v3_grasp_lift (release_vertical_lift_m 0.125, 12 steps, no oracle correction, default physics) at seeds 0-7 on T0-dev-01..06 and T1-. Tests H-010.
-- **X-037** (40/72 episodes run): v46_vlm_measure vs v0. PART A (40 eps, all fresh v46): T1-dev-01..12 (confirmatory) + old off-grid T2-dev-11..14, T3-dev-13..16 (exploratory), seeds 0-1. v0 con. Tests H-013.
+- **X-037** (56/72 episodes run): v46_vlm_measure vs v0. PART A (40 eps, all fresh v46): T1-dev-01..12 (confirmatory) + old off-grid T2-dev-11..14, T3-dev-13..16 (exploratory), seeds 0-1. v0 con. Tests H-013.
 
 ## Hypotheses
 
@@ -51,10 +51,11 @@ Use v45 (VLM structure + closed-loop placement) for rung-5 on T1 grid-aligned sc
 
 **Next:** H-013 Gate 0 (free, pixel-only measurement, 20 scenes). If it passes: v46_vlm_measure vs v0 on T1-dev-01..12 + 8 off-grid T2/T3 scenes, seeds 0-1, 40 episodes, on committed code. In parallel, once the human commits the tree and reloads the server: X-035 clean rung-2 test (32 episodes, H-014).
 
-**Budget:** 1467 of 1500 episodes used, 33 left. Record: 9 evidence, 14 hypotheses, 39 experiments, 77 runs, 14 results, 9 decisions.
+**Budget:** 1483 of 1500 episodes used, 17 left. Record: 9 evidence, 14 hypotheses, 39 experiments, 78 runs, 14 results, 9 decisions.
 
 ## Recent runs (videos inside)
 
+- R-078 v46_vlm_measure (rung 5), T2, T3: 0.69, failures {"placement_error": 4, "perception_mismatch": 1, "perception_missing_block": 1} - runs/1791085245_v46_vlm_measure [▶ T2-dev-15_s0](runs/1791085245_v46_vlm_measure/T2-dev-15_s0.gif) [▶ T2-dev-16_s0](runs/1791085245_v46_vlm_measure/T2-dev-16_s0.gif) [▶ T2-dev-16_s1](runs/1791085245_v46_vlm_measure/T2-dev-16_s1.gif)
 - R-077 v46_vlm_measure (rung 5), T1, T2, T3: 0.95, failures {"perception_mismatch": 2, "perception_missing_block": 2} - [runs/1791084911_v46_vlm_measure/RUN.md](runs/1791084911_v46_vlm_measure/RUN.md) [▶ T1-dev-01_s0](runs/1791084911_v46_vlm_measure/T1-dev-01_s0.gif) [▶ T1-dev-02_s0](runs/1791084911_v46_vlm_measure/T1-dev-02_s0.gif) [▶ T1-dev-03_s0](runs/1791084911_v46_vlm_measure/T1-dev-03_s0.gif)
 - R-076 v0 (rung 0), T0, T1: 1.00, failures {} - [runs/1791084837_v0/RUN.md](runs/1791084837_v0/RUN.md) [▶ T0-dev-01_s0](runs/1791084837_v0/T0-dev-01_s0.gif) [▶ T0-dev-02_s1](runs/1791084837_v0/T0-dev-02_s1.gif) [▶ T0-dev-03_s2](runs/1791084837_v0/T0-dev-03_s2.gif)
 - R-075 v0 (rung 0), T0: 1.00, failures {} - [runs/1791084625_v0/RUN.md](runs/1791084625_v0/RUN.md) [▶ T0-dev-04_s15](runs/1791084625_v0/T0-dev-04_s15.gif)
@@ -62,4 +63,3 @@ Use v45 (VLM structure + closed-loop placement) for rung-5 on T1 grid-aligned sc
 - R-073 v0 (rung 0), T0: 1.00, failures {} - [runs/1791084604_v0/RUN.md](runs/1791084604_v0/RUN.md) [▶ T0-dev-02_s13](runs/1791084604_v0/T0-dev-02_s13.gif)
 - R-072 v0 (rung 0), T0: 1.00, failures {} - [runs/1791084590_v0/RUN.md](runs/1791084590_v0/RUN.md) [▶ T0-dev-01_s12](runs/1791084590_v0/T0-dev-01_s12.gif)
 - R-071 v0 (rung 0), T0: 1.00, failures {} - [runs/1791084581_v0/RUN.md](runs/1791084581_v0/RUN.md) [▶ T0-dev-06_s11](runs/1791084581_v0/T0-dev-06_s11.gif)
-- R-070 v0 (rung 0), T0: 1.00, failures {} - [runs/1791084570_v0/RUN.md](runs/1791084570_v0/RUN.md) [▶ T0-dev-05_s10](runs/1791084570_v0/T0-dev-05_s10.gif)
