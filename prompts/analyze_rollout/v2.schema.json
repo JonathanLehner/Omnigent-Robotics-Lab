@@ -1,0 +1,72 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "failure_visible",
+    "phase",
+    "blocks",
+    "cause",
+    "placed_block_comparisons"
+  ],
+  "properties": {
+    "failure_visible": {
+      "type": "boolean"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "none",
+        "approach",
+        "grasp",
+        "carry",
+        "place",
+        "release",
+        "after_release"
+      ]
+    },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cause": {
+      "type": "string"
+    },
+    "placed_block_comparisons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "block_id",
+          "during_block_id",
+          "before_time_s",
+          "after_time_s",
+          "moved",
+          "comparison"
+        ],
+        "properties": {
+          "block_id": {
+            "type": "string"
+          },
+          "during_block_id": {
+            "type": "string"
+          },
+          "before_time_s": {
+            "type": "number"
+          },
+          "after_time_s": {
+            "type": "number"
+          },
+          "moved": {
+            "type": "boolean"
+          },
+          "comparison": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

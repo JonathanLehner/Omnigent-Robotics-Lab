@@ -433,8 +433,207 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
     return {"run_id": run_id, "summary": summary, "run_page": page, "videos": videos}
 
 
+def _inspection_events(trace: dict, place_height_m: float = 0.06) -> list[dict]:
+    """Add rendered-step placement-onset windows to exact release events."""
+    frames = trace["frames"]
+    releases = [dict(event) for event in trace["events"] if event["kind"] == "release"]
+    events = []
+    previous_release_s = -float("inf")
+    for release in releases:
+        block_id = release["block_id"]
+        active = [
+            frame
+            for frame in frames
+            if previous_release_s < frame["time_s"] <= release["time_s"]
+            and frame["active_block_id"] == block_id
+        ]
+        release_z = active[-1]["block_z_m"][block_id] if active else None
+        place_frame = None
+        if release_z is not None:
+            place_frame = next(
+                (
+                    frame
+                    for frame in active
+                    if frame["block_z_m"][block_id] <= release_z + place_height_m
+                ),
+                active[-1],
+            )
+        elif frames:
+            place_frame = min(
+                frames, key=lambda frame: abs(frame["time_s"] - release["time_s"])
+            )
+        if place_frame is not None:
+            prior = max(
+                (
+                    frame["time_s"]
+                    for frame in frames
+                    if frame["time_s"] < place_frame["time_s"]
+                ),
+                default=place_frame["time_s"],
+            )
+            events.append(
+                {
+                    "kind": "place",
+                    "block_id": block_id,
+                    "time_s": place_frame["time_s"],
+                    "onset_window_s": [prior, place_frame["time_s"]],
+                    "frame_index": place_frame["index"],
+                    "source": "rendered_step_entering_final_6cm_descent",
+                }
+            )
+        release_frame = next(
+            (
+                frame
+                for frame in frames
+                if frame["time_s"] >= release["time_s"]
+            ),
+            frames[-1] if frames else None,
+        )
+        if release_frame is not None:
+            release["frame_index"] = release_frame["index"]
+            release["frame_window_s"] = [
+                max(
+                    (
+                        frame["time_s"]
+                        for frame in frames
+                        if frame["time_s"] < release["time_s"]
+                    ),
+                    default=release["time_s"],
+                ),
+                release_frame["time_s"],
+            ]
+        events.append(release)
+        previous_release_s = release["time_s"]
+    return sorted(events, key=lambda event: (event["time_s"], event["kind"]))
+
+
+def _motion_warnings(trace: dict, events: list[dict], threshold_m: float = 0.01) -> list[dict]:
+    """Warn when a released block later moves more than the XY invariant."""
+    frames = trace["frames"]
+    warnings = []
+    for release in (event for event in events if event["kind"] == "release"):
+        block_id = release["block_id"]
+        origin = np.asarray(release["block_xy_m"], dtype=float)
+        later = [frame for frame in frames if frame["time_s"] > release["time_s"]]
+        samples = [
+            (
+                frame,
+                float(
+                    np.linalg.norm(
+                        np.asarray(frame["block_xy_m"][block_id], dtype=float)
+                        - origin
+                    )
+                ),
+            )
+            for frame in later
+        ]
+        onset_at = next(
+            (index for index, (_, distance) in enumerate(samples) if distance > threshold_m),
+            None,
+        )
+        if onset_at is None:
+            continue
+        onset_frame, _ = samples[onset_at]
+        peak_frame, peak_distance = max(samples, key=lambda sample: sample[1])
+        previous_time = (
+            samples[onset_at - 1][0]["time_s"]
+            if onset_at
+            else release["time_s"]
+        )
+        during_block = onset_frame["active_block_id"]
+        warning = {
+            "block_id": block_id,
+            "distance_m": peak_distance,
+            "threshold_m": threshold_m,
+            "onset_window_s": [previous_time, onset_frame["time_s"]],
+            "onset_frame_index": onset_frame["index"],
+            "peak_time_s": peak_frame["time_s"],
+            "peak_frame_index": peak_frame["index"],
+            "placing_block_id": during_block,
+        }
+        context = (
+            f"while placing {during_block}"
+            if during_block is not None
+            else "with no block held"
+        )
+        warning["text"] = (
+            f"WARNING: {block_id} moved {peak_distance * 100:.1f} cm after "
+            f"release; threshold onset t={previous_time:.3f}-{onset_frame['time_s']:.3f} s "
+            f"{context} (peak t={peak_frame['time_s']:.3f} s)."
+        )
+        warnings.append(warning)
+    return warnings
+
+
+def _save_contact_sheets(
+    frames: list,
+    metadata: list[dict],
+    path_stem: Path,
+    labels: dict[int, list[str]],
+    indices: list[int] | None = None,
+) -> list[str]:
+    """Save timestamped 4x6 sheets, preserving every requested frame."""
+    from PIL import Image, ImageDraw
+
+    selected = list(range(len(frames))) if indices is None else indices
+    annotated = []
+    for index in selected:
+        image = Image.fromarray(frames[index])
+        header = Image.new("RGB", (image.width, 24), (0, 0, 0))
+        text = f"frame {index}  t={metadata[index]['time_s']:.3f} s"
+        if labels.get(index):
+            text += "  |  " + "; ".join(labels[index])
+        ImageDraw.Draw(header).text((5, 5), text, fill=(255, 255, 255))
+        canvas = Image.new("RGB", (image.width, image.height + header.height))
+        canvas.paste(header, (0, 0))
+        canvas.paste(image, (0, header.height))
+        annotated.append(np.asarray(canvas))
+
+    paths = []
+    for page, start in enumerate(range(0, len(annotated), 24), start=1):
+        page_frames = annotated[start : start + 24]
+        blank = np.zeros_like(page_frames[0])
+        rows = [
+            np.concatenate(
+                page_frames[row : row + 4]
+                + [blank] * (4 - len(page_frames[row : row + 4])),
+                1,
+            )
+            for row in range(0, len(page_frames), 4)
+        ]
+        suffix = "" if page == 1 else f"_{page:03d}"
+        path = Path(f"{path_stem}{suffix}.png")
+        Image.fromarray(np.concatenate(rows, 0)).save(path)
+        paths.append(str(path))
+    return paths
+
+
+def _inspection_prompt_text(
+    frame_metadata: list[dict], events: list[dict], warnings: list[dict]
+) -> str:
+    return json.dumps(
+        {
+            "frame_timestamps_s": [
+                {"frame": frame["index"], "time_s": frame["time_s"]}
+                for frame in frame_metadata
+            ],
+            "events": events,
+            "warnings": warnings,
+        },
+        indent=2,
+        sort_keys=True,
+    )
+
+
+def _same_episode_outcome(logged: dict | None, rerendered: dict) -> bool | None:
+    if logged is None:
+        return None
+    keys = ("success", "failures", "blocks", "sim_time_s")
+    return all(logged.get(key) == rerendered.get(key) for key in keys)
+
+
 def render_rollout(run_id: str, scene_id: str, seed: int, every_s: float = 1.0) -> dict:
-    """Re-simulate one episode of a run with frames; save a contact sheet PNG and a GIF for the analyst."""
+    """Re-simulate one episode and emit complete, timestamped inspection sheets."""
     from PIL import Image
 
     from lab import pipeline
@@ -457,15 +656,76 @@ def render_rollout(run_id: str, scene_id: str, seed: int, every_s: float = 1.0) 
         cfg = copy.deepcopy(cfg)
         cfg["stages"]["perceive"] = "logged_parse"
         cfg["perceive"]["logged_blocks"] = logged["perceive"]["parsed_blocks"]
-    ep = pipeline.run_episode(scene, cfg, seed, frame_every_s=every_s)
+    ep = pipeline.run_episode(
+        scene, cfg, seed, frame_every_s=every_s, inspection=True
+    )
     frames = ep.pop("_frames")
+    trace = ep.pop("_inspection")
+    events = _inspection_events(trace)
+    warnings = _motion_warnings(trace, events)
     out = ROOT / run["data"]["results_path"] / f"rollout_{scene_id}_s{seed}"
-    rows = [np.concatenate(frames[i:i + 4] + [np.zeros_like(frames[0])] * (4 - len(frames[i:i + 4])), 1)
-            for i in range(0, len(frames), 4)]
-    Image.fromarray(np.concatenate(rows[:6], 0)).save(f"{out}.png")
+    labels: dict[int, list[str]] = {}
+    for event in events:
+        if "frame_index" in event:
+            labels.setdefault(event["frame_index"], []).append(
+                f"{event['kind']} {event['block_id']}"
+            )
+    for warning in warnings:
+        labels.setdefault(warning["onset_frame_index"], []).append(
+            f"motion spike {warning['block_id']}"
+        )
+        labels.setdefault(warning["peak_frame_index"], []).append(
+            f"peak {warning['block_id']} {warning['distance_m'] * 100:.1f}cm"
+        )
+
+    contact_sheets = _save_contact_sheets(
+        frames, trace["frames"], out, labels
+    )
+    event_indices = sorted(
+        {
+            nearby
+            for index in labels
+            for nearby in (index - 1, index, index + 1)
+            if 0 <= nearby < len(frames)
+        }
+    )
+    event_sheets = _save_contact_sheets(
+        frames,
+        trace["frames"],
+        Path(f"{out}_events"),
+        labels,
+        event_indices,
+    )
     ims = [Image.fromarray(f) for f in frames]
     ims[0].save(f"{out}.gif", save_all=True, append_images=ims[1:], duration=int(every_s * 250), loop=0)
-    return {"contact_sheet": f"{out}.png", "gif": f"{out}.gif", "episode": ep}
+    prompt_text = _inspection_prompt_text(trace["frames"], events, warnings)
+    return {
+        "contact_sheet": contact_sheets[0],
+        "contact_sheets": contact_sheets,
+        "event_sheets": event_sheets,
+        "gif": f"{out}.gif",
+        "frame_timestamps_s": [
+            frame["time_s"] for frame in trace["frames"]
+        ],
+        "block_xy_trace": [
+            {
+                "frame": frame["index"],
+                "time_s": frame["time_s"],
+                "block_xy_m": frame["block_xy_m"],
+                "active_block_id": frame["active_block_id"],
+            }
+            for frame in trace["frames"]
+        ],
+        "events": events,
+        "warnings": warnings,
+        "analysis": {
+            "prompt": "prompts/analyze_rollout/v2.md",
+            "text": prompt_text,
+            "images": event_sheets or contact_sheets,
+        },
+        "replay_outcome_identical": _same_episode_outcome(logged, ep),
+        "episode": ep,
+    }
 
 
 if __name__ == "__main__":

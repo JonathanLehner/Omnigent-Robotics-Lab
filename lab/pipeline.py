@@ -173,7 +173,31 @@ def _pose_dict(pose):
     }
 
 
-def _observe_pre_release_poses(world):
+def _record_inspection_event(trace, world, kind, block_id):
+    """Append an inspection event, coalescing weld and gripper-open release hooks."""
+    if trace is None:
+        return
+    timestamp = float(world.d.time)
+    if trace["events"]:
+        previous = trace["events"][-1]
+        if (
+            previous["kind"] == kind
+            and previous["block_id"] == block_id
+            and previous["time_s"] == timestamp
+        ):
+            return
+    pos, _ = world.block_pose(block_id)
+    trace["events"].append(
+        {
+            "kind": kind,
+            "block_id": block_id,
+            "time_s": timestamp,
+            "block_xy_m": np.asarray(pos[:2], dtype=float).tolist(),
+        }
+    )
+
+
+def _observe_pre_release_poses(world, inspection_trace=None):
     """Record pose reads immediately preceding weld or gripper release.
 
     The wrappers only read simulator state and delegate to the original methods,
@@ -196,6 +220,9 @@ def _observe_pre_release_poses(world):
         if world.held:
             block_id = world.held[0]
             poses[block_id] = block_pose(block_id)
+            _record_inspection_event(
+                inspection_trace, world, "release", block_id
+            )
         return release()
 
     def observed_set_gripper(open_):
@@ -206,6 +233,9 @@ def _observe_pre_release_poses(world):
             is_already_open = np.isclose(world.d.ctrl[gripper_act], -1.0)
             if saw_open and not is_already_open and last_pose[0] is not None:
                 poses[last_pose[0]] = last_pose[1]
+                _record_inspection_event(
+                    inspection_trace, world, "release", last_pose[0]
+                )
             saw_open = True
         return set_gripper(open_)
 
@@ -215,7 +245,13 @@ def _observe_pre_release_poses(world):
     return poses
 
 
-def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None = None) -> dict:
+def run_episode(
+    scene: dict,
+    cfg: dict,
+    seed: int,
+    frame_every_s: float | None = None,
+    inspection: bool = False,
+) -> dict:
     rng = np.random.default_rng(seed)
     log = {
         "scene": scene["id"],
@@ -280,7 +316,33 @@ def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None =
     world = sim.World(blocks, arm_block_collision=cfg.get("arm_block_collision", False), frame_every_s=frame_every_s,
                       target=[scenes.to_world(b) for b in scene["target"]["blocks"]] if frame_every_s else None,
                       target_pictures=pictures, physics=cfg.get("physics"))
-    pre_release_poses = _observe_pre_release_poses(world)
+    inspection_trace = {"frames": [], "events": []} if inspection else None
+    if inspection_trace is not None:
+        render = world.render
+        block_ids = [block["id"] for block in blocks]
+
+        def inspected_render(*args, **kwargs):
+            frame = render(*args, **kwargs)
+            poses = {block_id: world.block_pose(block_id)[0] for block_id in block_ids}
+            inspection_trace["frames"].append(
+                {
+                    "index": len(inspection_trace["frames"]),
+                    "time_s": float(world.d.time),
+                    "block_xy_m": {
+                        block_id: pose[:2].astype(float).tolist()
+                        for block_id, pose in poses.items()
+                    },
+                    "block_z_m": {
+                        block_id: float(pose[2])
+                        for block_id, pose in poses.items()
+                    },
+                    "active_block_id": world.held[0] if world.held else None,
+                }
+            )
+            return frame
+
+        world.render = inspected_render
+    pre_release_poses = _observe_pre_release_poses(world, inspection_trace)
     STAGES["build"][cfg["stages"]["build"]](world, spec, order, pairs, cfg, log)
     world.step(int(metrics.SETTLE_S / world.m.opt.timestep))  # verify: settle after the last release
     per_block = []
@@ -327,6 +389,8 @@ def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None =
     log["sim_time_s"] = float(world.d.time)
     if frame_every_s:
         log["_frames"] = world.frames
+    if inspection:
+        log["_inspection"] = inspection_trace
     return log
 
 
