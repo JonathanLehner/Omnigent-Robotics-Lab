@@ -59,7 +59,16 @@ def perceive_vlm(scene, cfg):
         b.setdefault("id", f"p{i}")
         b.setdefault("yaw", 0.0)
     scenes.support_relations(blocks)
-    return blocks, {"model_key": res["key"], "cached": res["cached"]}
+    info = {"model_key": res["key"], "cached": res["cached"]}
+    if cfg.get("telemetry", {}).get("schema") == "h020_combo_v1":
+        info.update(
+            {
+                "prompt_sha256": res["prompt_sha256"],
+                "image_sha256": res["image_sha256"],
+                "response_sha256": res["response_sha256"],
+            }
+        )
+    return blocks, info
 
 
 # --- plan_order --------------------------------------------------------------
@@ -240,6 +249,14 @@ def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None =
         vlm_anchor_telemetry.attach_position_errors(
             log["perceive"], spec, scene, pairs
         )
+    from lab.stages import h020_telemetry
+
+    h020_telemetry_enabled = h020_telemetry.enabled(cfg)
+    if h020_telemetry_enabled and "perceive" in log:
+        h020_telemetry.attach_perception_errors(
+            log["perceive"], spec, scene, pairs
+        )
+        h020_telemetry.attach_order(log, order, spec, scene, pairs)
     pictures = {}
     if frame_every_s:  # videos show the target: ghost blocks at the site + the picture Spot was given
         views = scene.get("image_views", {})
@@ -278,6 +295,18 @@ def run_episode(scene: dict, cfg: dict, seed: int, frame_every_s: float | None =
             )
         ):
             log["failures"].append("perception_localization")
+    if h020_telemetry_enabled and "perceive" in log:
+        h020_telemetry.attach_placement_residuals(
+            log["perceive"], per_block, spec
+        )
+        attribution = h020_telemetry.classify_failure(log)
+        log["failure_attribution"] = attribution
+        if (
+            attribution
+            and attribution != "walk_drift_absorbed"
+            and attribution not in log["failures"]
+        ):
+            log["failures"].append(attribution)
     if not log["success"] and not log["failures"]:
         log["failures"].append("placement_error")
     log["sim_time_s"] = float(world.d.time)

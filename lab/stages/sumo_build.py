@@ -216,11 +216,22 @@ def build_sumo_walk_then_scripted_weld(world, spec, order, pairs, cfg, log):
     result = _run_sumo(cfg, episode_seed=int(log["seed"]))
     episode = _episode(result)
     log["stages"].append({"phase": "walk_approach", **episode})
+    h020_logging = (
+        cfg.get("telemetry", {}).get("schema") == "h020_combo_v1"
+    )
+    if h020_logging:
+        from lab.stages.h020_telemetry import walk_end_telemetry
+
+        log["walk_end"] = walk_end_telemetry(episode)
     if not episode["success"]:
         log["failures"].append("walk_approach_failed")
         return
-    log["stages"].append({"phase": "sumo_to_assembly_state_bridge",
-                          **_bridge_walked_base_pose(world, episode)})
+    bridge = _bridge_walked_base_pose(world, episode)
+    log["stages"].append(
+        {"phase": "sumo_to_assembly_state_bridge", **bridge}
+    )
+    if h020_logging:
+        log["walk_end"] = walk_end_telemetry(episode, bridge)
     build_scripted_weld(world, spec, order, pairs, cfg, log)
 
 

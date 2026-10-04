@@ -156,10 +156,49 @@ def gates(method: str, scene_ids: list[str], final_eval: bool) -> dict:
             json.loads((ROOT / p["prompt"]).with_suffix(".schema.json").read_text())
             (ROOT / p["prompt"]).read_text()
     loaded = [scenes.load_scene(s) for s in scene_ids]
+    expected_scene_files = cfg.get("telemetry", {}).get("scene_file_count")
+    if expected_scene_files is not None:
+        for scene in loaded:
+            _check_scene_hash_coverage(scene, int(expected_scene_files))
     held = [s["id"] for s in loaded if s["split"] == "heldout"]
     if held and not final_eval:
         raise RuntimeError(f"gate:heldout: {held} are held-out; only the human-approved final evaluation may use them")
     return {"cfg": cfg, "scenes": loaded}
+
+
+def _check_scene_hash_coverage(scene: dict, expected_count: int) -> None:
+    """Require a digest for every scene byte source consumed by an episode."""
+    expected = {
+        f"scenes/{scene['split']}/{scene['id']}.json",
+        scene["image"],
+        scene.get("image_multiview"),
+        *(scene.get("image_views") or {}).values(),
+    }
+    expected.discard(None)
+    actual = set(scene.get("_loaded_scene_files_sha256", {}))
+    if len(expected) != expected_count or actual != expected:
+        raise RuntimeError(
+            f"gate:scene_hash_coverage:{scene['id']}: expected "
+            f"{expected_count} distinct files and exact loader coverage; "
+            f"declared={len(expected)}, hashed={len(actual)}, "
+            f"missing={sorted(expected - actual)}, extra={sorted(actual - expected)}"
+        )
+
+
+def _method_arm_cap(
+    experiment_id: str, method: str, planned_episodes: int | None = None
+) -> int | None:
+    if experiment_id == "X-049" and method in {
+        "v6_combo",
+        "v6_combo_t0",
+        "v0",
+    }:
+        # X-049 is 192 episodes under Branch A and 96 under Branch B. Keep the
+        # arms matched even if the record still carries the pre-branch total.
+        half = (planned_episodes or 192) // 2
+        ceiling = 48 if method == "v6_combo_t0" else 96
+        return min(ceiling, half)
+    return METHOD_ARM_CAPS.get(method)
 
 
 VIDEO_FRAME_S = 0.4  # sim seconds between video frames; played back at 4x speed
@@ -270,14 +309,17 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
         for r in prior
         if r["data"]["method"] == method
     )
+    arm_cap = _method_arm_cap(
+        experiment_id, method, int(exp["data"]["episodes"])
+    )
     if (
         not final_eval
-        and method in METHOD_ARM_CAPS
-        and method_episodes_so_far + n > METHOD_ARM_CAPS[method]
+        and arm_cap is not None
+        and method_episodes_so_far + n > arm_cap
     ):
         raise RuntimeError(
             f"experiment {experiment_id} caps method {method} at "
-            f"{METHOD_ARM_CAPS[method]} episodes; {method_episodes_so_far} already "
+            f"{arm_cap} episodes; {method_episodes_so_far} already "
             f"run, {n} more requested"
         )
     if not final_eval and episodes_so_far + n > int(exp["data"]["episodes"]):

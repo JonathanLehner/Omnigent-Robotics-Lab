@@ -1,0 +1,34 @@
+name: v6_combo_t0
+rung: 5
+idealizations:
+  - weld_grasp
+  - scripted_arm
+  - no_arm_block_collision
+  - sumo_to_assembly_state_bridge
+  - fixed_nominal_walk_start
+arm_block_collision: false
+max_workers: 1
+stages:
+  perceive: vlm
+  plan_order: support_sort
+  build: sumo_walk_then_scripted_weld
+perceive:
+  model: codex
+  prompt: prompts/perceive/v1.md
+sumo:
+  task: spot_walk_approach
+  task_module: lab/sumo_tasks/spot_walk_approach.py
+  policy: Relic
+  optimizer: cem
+  num_rollouts: 24
+  episode_length_s: 4.0
+  walk_starts: varied_v1
+  timeout_s: 600
+  approach_tolerance_m: 0.25
+params:
+  segment_s: 1.0
+  place_clearance_m: 0.005
+  carry_height_m: 0.15
+telemetry:
+  schema: h020_combo_v1
+  scene_file_count: 7
