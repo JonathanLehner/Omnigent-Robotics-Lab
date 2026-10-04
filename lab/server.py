@@ -251,13 +251,14 @@ def budget_status() -> dict:
 
 @mcp.tool()
 def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episodes_per_scene: int = 3,
-                  seed0: int = 0, final_eval: bool = False, max_workers: int = 0) -> dict:
+                  seed0: int = 0, final_eval: bool = False, max_workers: int = 0, pairs: list[list] | None = None) -> dict:
     """Runner only: run a SELECTED experiment. Gates + one-episode smoke test first (free), then parallel episodes.
     final_eval=True unlocks held-out scenes and requires human approval. max_workers: parallel episodes (0 = default:
-    8, or 1 for Sumo-based methods, which are load-sensitive); set 1 to run serially."""
+    8, or 1 for Sumo-based methods, which are load-sensitive); set 1 to run serially. pairs: explicit
+    [[scene_id, seed], ...] for designs that are not scenes x consecutive seeds (one batch instead of many calls)."""
     _fresh()
     return _j(runner.run_sim_batch(experiment_id, scene_ids, method, episodes_per_scene, seed0, final_eval=final_eval,
-                                   max_workers=max_workers or None))
+                                   max_workers=max_workers or None, pairs=pairs))
 
 
 @mcp.tool()

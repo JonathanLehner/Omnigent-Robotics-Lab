@@ -230,26 +230,36 @@ def write_run_page(
 
 def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episodes_per_scene: int = 3,
                   seed0: int = 0, author: str = "experiment_runner", final_eval: bool = False,
-                  max_workers: int | None = None) -> dict:
+                  max_workers: int | None = None, pairs: list | None = None) -> dict:
+    """pairs: optional explicit [[scene_id, seed], ...] (e.g. one episode per seed, round-robin over scenes);
+    when given, scene_ids/episodes_per_scene/seed0 are ignored for job construction."""
     fingerprint = capture_run_fingerprint()
     exp = record.get(experiment_id)
     if exp is None or exp["kind"] != "experiment":
         raise ValueError(f"{experiment_id!r} is not an experiment in the record")
     if exp["data"].get("status") != "selected" and not final_eval:
         raise ValueError(f"experiment {experiment_id} has status {exp['data'].get('status')!r}; the planner must select it first")
+    if pairs:
+        pairs = [(str(sc), int(sd)) for sc, sd in pairs]
+        scene_ids = sorted({sc for sc, _ in pairs})
     g = gates(method, scene_ids, final_eval)
-    n = len(scene_ids) * episodes_per_scene
+    n = len(pairs) if pairs else len(scene_ids) * episodes_per_scene
     prior = record.query("run", contains=f'"experiment_id": "{experiment_id}"', limit=1000)
     # A batch call evaluates one method. A parity/verification run made under
     # the same experiment id for another method is still globally charged, but
     # must not consume this method arm's planned scene/seed tuples.
-    done = {(scene_id, seed)
-            for r in prior if r["data"]["method"] == method
-            for scene_id in r["data"].get("scene_ids", [])
-            for seed in range(r["data"]["seeds"][0], r["data"]["seeds"][1] + 1)}
-    requested = {(scene_id, seed0 + i)
-                 for scene_id in scene_ids
-                 for i in range(episodes_per_scene)}
+    done = set()
+    for r in prior:
+        if r["data"]["method"] != method:
+            continue
+        if r["data"].get("pairs"):  # explicit (scene, seed) runs
+            done |= {(sc, int(sd)) for sc, sd in r["data"]["pairs"]}
+        else:
+            done |= {(scene_id, seed) for scene_id in r["data"].get("scene_ids", [])
+                     for seed in range(r["data"]["seeds"][0], r["data"]["seeds"][-1] + 1)}
+    requested = set(pairs) if pairs else {(scene_id, seed0 + i)
+                                          for scene_id in scene_ids
+                                          for i in range(episodes_per_scene)}
     if not final_eval and len(done | requested) > int(exp["data"]["episodes"]):
         raise RuntimeError(f"experiment {experiment_id} planned {exp['data']['episodes']} unique episodes; "
                            f"{len(done)} already run for {method}, "
@@ -265,7 +275,15 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
     run_dir = RUNS / f"{int(t0)}_{method}"
     run_dir.mkdir(parents=True, exist_ok=True)
     # video for the first seed of every scene, plus every failed episode
-    jobs = [(s, g["cfg"], seed0 + i, str(run_dir), i == 0) for s in g["scenes"] for i in range(episodes_per_scene)]
+    by_id = {sc["id"]: sc for sc in g["scenes"]}
+    if pairs:
+        seen = set()
+        jobs = []
+        for sc, sd in pairs:
+            jobs.append((by_id[sc], g["cfg"], sd, str(run_dir), sc not in seen))
+            seen.add(sc)
+    else:
+        jobs = [(s, g["cfg"], seed0 + i, str(run_dir), i == 0) for s in g["scenes"] for i in range(episodes_per_scene)]
     # Sumo-based stages are load-sensitive (RS-011: walk outcomes changed under CPU contention), so they run
     # one episode at a time unless the method config or the caller says otherwise.
     sumo = "sumo" in str(g["cfg"]["stages"].get("build", ""))
@@ -292,7 +310,8 @@ def run_sim_batch(experiment_id: str, scene_ids: list[str], method: str, episode
         "experiment_id": experiment_id, "method": method,
         "commit": f"{fingerprint['git_head'][:7]}+state.{fingerprint['id'][:8]}",
         "run_fingerprint": fingerprint, "scene_ids": scene_ids,
-        "seeds": [seed0, seed0 + episodes_per_scene - 1], "episodes": n, "results_path": str(run_dir.relative_to(ROOT)),
+        "seeds": sorted({sd for _, sd in pairs}) if pairs else [seed0, seed0 + episodes_per_scene - 1], "episodes": n,
+        "pairs": [list(x) for x in pairs] if pairs else None, "results_path": str(run_dir.relative_to(ROOT)),
         "final_eval": final_eval, "idealizations": g["cfg"].get("idealizations", []), "summary": summary})
     page = write_run_page(run_dir, run_id, method, experiment_id, eps, summary, fingerprint)
     videos = [{"scene": e["scene"], "seed": e["seed"], "success": e["success"], **e["video"]} for e in eps if e.get("video")]
