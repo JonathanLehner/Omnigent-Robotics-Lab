@@ -6,10 +6,10 @@
 |:--:|:--|:--:|:--:|:--:|:--:|:--|
 | 0 | Baseline (all oracles) | 🟢 1.00 | 🟢 1.00 | 🟢 0.96 | 🟢 0.98 | 🟢 Passed |
 | 1 | Planned build order | 🟢 1.00 | 🟢 1.00 | 🟢 0.94 | 🟢 0.98 | 🟢 Passed |
-| 2 | Walking approach | 🟢 0.94 | 🟢 1.00 | 🟢 0.92 | 🟢 0.88 | 🟢 Passed |
+| 2 | Walking approach | 🔵 0.94 | 🟢 1.00 | 🟢 0.92 | 🟢 0.88 | 🔵 Running: T0 |
 | 3 | Real gripper grasp | 🔴 0.75 | 🔴 0.00 | ⚪ – | ⚪ – | 🔴 Below target: T0, T1 |
 | 4 | Lab-chosen placement (MPC) | 🔴 0.00 | 🔵 1.00 | 🔵 0.62 | 🔵 0.25 | 🔵 Running: T1, T2, T3 |
-| 5 | Structure from picture | 🟢 1.00 | 🟢 1.00 | 🟢 0.96 | 🟢 1.00 | 🟢 Passed |
+| 5 | Structure from picture | 🔵 1.00 | 🔵 1.00 | 🔵 0.96 | 🔵 1.00 | 🔵 Running: T0, T1, T2, T3 |
 
 🟢 passed (>= 0.80)  🔵 running now  🔴 below target  ⚪ not started. Success rate on dev scenes, latest run per cell.
 
@@ -25,6 +25,11 @@ R0/T0 1.00 [0.93, 1.00] n=48 (R-099); R0/T1 1.00 [0.93, 1.00] n=48 (R-099); R0/T
 - **X-022** (0/24 episodes run): Rung-4 MPC T0 probe, run SERIALLY after X-019 finishes. Run v4_mpc (Sumo CEM placement; cost = block pose + upright + collision clearance + settle velocity + an. Tests -.
 - **X-025** (0/96 episodes run): Full pre-registered design. v3_grasp_lift (release_vertical_lift_m 0.125, 12 steps, no oracle correction, default physics) at seeds 0-7 on T0-dev-01..06 and T1-. Tests H-010.
 - **X-044** (0/157 episodes run): X-014 remainder: v4_place with x-shortfall fix, 157 episodes on T1-T3 dev scenes, plus a matched fresh v0 control.. Tests H-006.
+- **X-065** (0/32 episodes run): v2_walk_head vs fresh v2_walk (stage 1 T0 screen). 16 pairs: scene T0-dev-((s mod 6)+1), fresh seeds 9000-9015. Caps: v2_walk_head 16, v2_walk 16, one primary b. Tests H-023.
+- **X-067** (0/288 episodes run): Three arms on identical pairs: v3_grasp_hold (changes 1+2), v3_grasp_hold_c1 (change 1 only), fresh v3_grasp control. T0-dev-01..06 x 8 seeds, 7000-7047 (scene . Tests H-024.
+- **X-069** (0/288 episodes run): v6_combo_aware vs fresh v6_combo (passive movement logging on, placed_block_telemetry true), identical pairs. T2 12 scenes x 4 seeds from 8000+4j (48 pairs); T3. Tests H-025.
+- **X-071** (0/464 episodes run): Two components on one frozen commit. (E1, offline, primary): 20 uncached v47 parses x 58 targeted images (methods/v6_combo_v47b.targets.json, sha256 recorded at. Tests H-026.
+- **X-073** (0/192 episodes run): H-026 E3+E4: v6_combo_v47b vs fresh v6_combo on identical pairs. E3 (T2): scenes 01,02,03,06,11,12,19,22,24,25,26,28, seeds 10000+4j..10003+4j (10000-10047), 48. Tests H-026.
 
 ## Hypotheses
 
@@ -34,7 +39,7 @@ R0/T0 1.00 [0.93, 1.00] n=48 (R-099); R0/T1 1.00 [0.93, 1.00] n=48 (R-099); R0/T
 | H-002 | 5 | refuted | Replacing the oracle structure spec with VLM parsing (perceive=vlm, call_model image->JSON with block type + pose), with oracle order and bu |
 | H-003 | 5 | open | Hybrid rung-5 perception (VLM for block count, type, color and support relations, followed by a geometric contact snap: x=0, z=0.05+0.10*lay |
 | H-004 | 3 | refuted | Rung 3, v3_grasp (methods/v3_grasp.yaml, stage lab/stages/real_grasp.py, build=scripted_real_grasp): the weld is replaced by a physical Spot |
-| H-005 | 0 | refuted | [X-016 | rungs 0 and 3, cross-cutting | filed before any X-016 results were read] Contact creep from MuJoCo's default pyramidal friction con |
+| H-005 | 0 | reopened | [X-016 | rungs 0 and 3, cross-cutting | filed before any X-016 results were read] Contact creep from MuJoCo's default pyramidal friction con |
 | H-006 | 4 | reopened | [X-014 | rung 4 | filed before any X-014 / v4_place results were read] v4_place (methods/v4_place.yaml, build=closed_loop_weld_place, lab/st |
 | H-007 | 0 | open | [X-016 | rungs 0 and 3, cross-cutting | AMENDS H-005 part (b); filed before any X-016 results were read; part (a) unchanged] (a) Contact cre |
 | H-008 | 5 | refuted | [rung 5 / '4.5' | filed before any v45 results] v45_place_vlm (perceive=vlm with codex + prompts/perceive/v1.md, plan_order=oracle, build=cl |
@@ -74,7 +79,7 @@ Rung 2 standalone on T2/T3: H-021 PARTIAL (RS-029 + RS-030, ACCE
 (3) Placement tail: a closed-loop correction aware of previously placed blocks (T2-dev-12 s4023-type pushes), plus the regression of block error on bridged base height/roll/pitch.
 (4) W
 
-**Budget:** 2979 of 50000 episodes used, 47021 left. Record: 25 evidence, 27 hypotheses, 64 experiments, 104 runs, 31 results, 18 decisions.
+**Budget:** 2979 of 50000 episodes used, 47021 left. Record: 28 evidence, 27 hypotheses, 74 experiments, 104 runs, 31 results, 18 decisions.
 
 ## Recent runs (videos inside)
 
