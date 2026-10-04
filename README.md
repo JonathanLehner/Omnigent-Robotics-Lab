@@ -73,7 +73,7 @@ Each agent is an Omnigent configuration in `agents/assembly_lab/` with its own m
 **Prerequisites:** `uv`, `tmux`, Node 22+, `claude` and `codex` CLIs logged in. Optional: [Sumo](https://github.com/rai-opensource/sumo) in `~/src/sumo` (`pixi install && pixi run build`) for walking and MPC placement.
 
 ```bash
-git clone https://github.com/JonathanLehner/Omnigent-Robotics-Lab.git && cd Omnigent-Robotics-Lab
+git clone https://github.com/JonathanLehner/Opal-Robotics-Lab.git && cd Opal-Robotics-Lab
 ./lab.sh setup     # uv env, Omnigent + lab policies, benchmark scenes, frozen evaluation
 ./lab.sh run       # pursue the research goal autonomously; watch at http://127.0.0.1:6767
 ./lab.sh report    # export record/export.json and REPORT.md
