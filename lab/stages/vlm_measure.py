@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import colorsys
-import hashlib
-import json
 import uuid
 from pathlib import Path
 
@@ -163,11 +161,13 @@ def perceive_vlm_measure(scene, cfg):
     """
     vlm_picture, measurement_picture = _picture_inputs(scene)
     perceive_cfg = cfg["perceive"]
+    sample_text = _sample_text(perceive_cfg)
     result = call_model(
         perceive_cfg["model"],
         perceive_cfg["prompt"],
-        text=_sample_text(perceive_cfg),
+        text=sample_text,
         image=str(vlm_picture),
+        use_cache=bool(perceive_cfg.get("cached", True)),
     )
     vlm_blocks = result["output"]["blocks"]
     image = np.asarray(Image.open(measurement_picture).convert("RGB"))
@@ -212,14 +212,14 @@ def perceive_vlm_measure(scene, cfg):
         block["lateral_measurement_source"] = "vlm_rough_y" if fallback else "target_pixels"
         blocks.append(block)
 
-    output_hash = hashlib.sha256(
-        json.dumps(result["output"], sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
     return blocks, {
         "model_key": result["key"],
         "cached": bool(result["cached"]),
         "cache_mode": perceive_cfg.get("cache_mode", "fresh_per_seed"),
-        "vlm_output_sha256": output_hash,
+        "prompt_sha256": result["prompt_sha256"],
+        "image_sha256": result["image_sha256"],
+        "response_sha256": result["response_sha256"],
+        "vlm_output_sha256": result["response_sha256"],
         "measurement_view": "robot side",
         "pixels_per_m": pixels_per_m,
         "fallback_blocks": sum(b["lateral_measurement_fallback"] for b in blocks),

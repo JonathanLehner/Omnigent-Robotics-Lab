@@ -19,6 +19,7 @@ perceive:
   model: codex
   prompt: prompts/perceive/v2.md
   cache_mode: fresh_per_seed
+  cached: false
 params:
   segment_s: 1.0
   place_clearance_m: 0.005
