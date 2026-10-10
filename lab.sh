@@ -31,7 +31,7 @@ Pursue it autonomously: read the goal file, resume from the research record, and
     if [ -n "$aid" ] && [ -d "$HOME/.omnigent/artifacts/.cache/$aid" ]; then cp -R agents/assembly_lab/. "$HOME/.omnigent/artifacts/.cache/$aid/"; fi
     # Watchdog: wakes the PI when the lab is idle (a sub-agent can die without ever reporting back).
     sid=$(sqlite3 ~/.omnigent/chat.db "select lower(hex(c.id)) from conversations c join agents a on a.id = c.agent_id where a.name = 'assembly_lab_pi' and c.parent_conversation_id is null order by c.updated_at desc limit 1" 2>/dev/null)
-    pkill -f "lab.watchdog" 2>/dev/null; [ -n "$sid" ] && (nohup uv run --quiet python -m lab.watchdog "$sid" > runs/watchdog.log 2>&1 &)
+    pkill -f "lab.watchdog" 2>/dev/null || true; [ -n "$sid" ] && (nohup uv run --quiet python -m lab.watchdog "$sid" > runs/watchdog.log 2>&1 &)
     omnigent run agents/assembly_lab --continue "$@" || exec omnigent run agents/assembly_lab "$@"
     ;;
   baseline)
